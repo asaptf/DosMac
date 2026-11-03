@@ -246,6 +246,9 @@ struct LibraryView: View {
                     if model.running, !model.floppyDrive.disks.isEmpty {
                         FloppyDrivePanel(model: model)
                     }
+                    if model.running {
+                        SessionInputPanel { model.session.showEmulator() }
+                    }
                     HStack {
                         Text("Your library").font(.title2.weight(.semibold))
                         Text(String(model.programs.count)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)

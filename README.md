@@ -35,6 +35,8 @@ Use **Add from web** to paste a WinWorld product/download page or a direct HTTPS
 
 When Setup requests another disk, use the **Floppy drive · A:** panel above the library. Click **Next disk**, or choose a disk and click **Insert selected disk**. Return to the installer and press Enter after the panel confirms the inserted disk. On macOS, disk buttons require Accessibility permission for DosMac; click **Enable disk controls…** to open the system prompt. Without permission, use **F12 + O** in DOSBox-X (possibly **Fn + F12 + O** on a Mac keyboard). See [disk controls](docs/disk-controls.md).
 
+In graphical Windows Setup, click inside the DOSBox-X screen to capture the mouse. DosMac enables click-to-capture automatically; the standard Windows 3.1 driver requires captured relative input. Press **Ctrl + F10** to release it (**Ctrl + Fn + F10** on some Mac keyboards), or use **Main → Capture mouse** in DOSBox-X. The running-session panel includes these instructions. See [mouse input](docs/mouse-input.md).
+
 ## Build for iPhone
 
 ```sh

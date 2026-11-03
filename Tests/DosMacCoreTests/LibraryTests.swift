@@ -67,6 +67,7 @@ struct LibraryTests {
         let item = try await library.install(from: package)
         let config = try DOSBoxConfiguration.render(program: item, driveC: library.programURL(item.id).appendingPathComponent("DriveC"), exchange: library.exchangeURL)
         #expect(config.contains("core=normal"))
+        #expect(config.contains("autolock=true"))
         #expect(config.contains("cputype=386"))
         #expect(config.contains("mount d \"\(library.exchangeURL.path)\""))
         #expect(!config.contains("mount c \"/\""))
