@@ -97,7 +97,9 @@ public final class EmulatorSession {
         if case .running = state { throw DosMacError.sessionActive }
         #if os(macOS)
         guard let engine else { throw DosMacError.engineMissing }
-        let disks = try await library.floppyDisks(for: program)
+        // Installation images remain stored, but DOS/installed Windows do not mount them.
+        let disks = program.manifest.effectiveStartupMode == .dosPrompt || program.manifest.hasWindowsEntryPoint
+            ? [] : try await library.floppyDisks(for: program)
         let folder = library.programURL(program.id)
         let config = try DOSBoxConfiguration.render(program: program, driveC: folder.appendingPathComponent("DriveC"), exchange: library.exchangeURL)
         let configURL = folder.appendingPathComponent("session.conf")

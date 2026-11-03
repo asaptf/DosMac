@@ -29,6 +29,11 @@ public enum MachineProfile: String, Codable, CaseIterable, Sendable {
     public var cpu: String { self == .dos ? "386" : "486" }
 }
 
+public enum StartupMode: String, Codable, CaseIterable, Sendable {
+    case program, dosPrompt
+    public var title: String { self == .program ? "Program" : "DOS prompt on C:" }
+}
+
 public struct PackageManifest: Codable, Equatable, Sendable {
     public var formatVersion: Int
     public var id: String
@@ -40,6 +45,12 @@ public struct PackageManifest: Codable, Equatable, Sendable {
     public var executable: String
     public var profile: MachineProfile
     public var floppyDisks: [FloppyDisk]?
+    public var startupMode: StartupMode?
+
+    public var effectiveStartupMode: StartupMode { startupMode ?? .program }
+    public var hasWindowsEntryPoint: Bool {
+        executable.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last?.uppercased() == "WIN.COM"
+    }
 
     public init(id: String, title: String, summary: String, version: String = "1.0", author: String, license: String, executable: String, profile: MachineProfile = .dos) {
         self.formatVersion = 1

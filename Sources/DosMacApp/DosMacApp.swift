@@ -282,7 +282,10 @@ struct LibraryView: View {
                     }
                     if let current = model.sessionProgram ?? model.current {
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) { Text(current.manifest.title).font(.headline); Text(current.manifest.profile.title + " · D: Exchange enabled").font(.caption).foregroundStyle(.secondary) }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(current.manifest.title).font(.headline)
+                                Text(current.manifest.profile.title + (current.manifest.effectiveStartupMode == .dosPrompt ? " · DOS prompt on C:" : "") + " · D: Exchange enabled").font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
                             Button { showStartup = true } label: { Image(systemName: "gearshape") }.help("Change startup program").disabled(model.running)
                             if model.running {

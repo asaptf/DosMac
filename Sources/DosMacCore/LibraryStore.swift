@@ -118,11 +118,18 @@ public actor LibraryStore {
         return result.sorted()
     }
 
-    public func updateStartup(_ program: InstalledProgram, executable: String, profile: MachineProfile) throws {
-        guard try entryPoints(for: program).contains(executable) else { throw DosMacError.invalidPackage("startup program is not on this program's C: drive") }
+    public func updateStartup(_ program: InstalledProgram, executable: String, profile: MachineProfile, mode: StartupMode = .program) throws {
+        if mode == .program {
+            guard try entryPoints(for: program).contains(executable) else { throw DosMacError.invalidPackage("startup program is not on this program's C: drive") }
+        }
         var manifest = program.manifest
         manifest.executable = executable
         manifest.profile = profile
+        manifest.startupMode = mode
+        if mode == .program, manifest.hasWindowsEntryPoint, manifest.title.hasSuffix(" · Setup") {
+            manifest.title = String(manifest.title.dropLast(" · Setup".count))
+            manifest.summary = "Installed Windows on this program's C: drive. Launch directly without the installation disks."
+        }
         try manifest.validate()
         let updated = InstalledProgram(manifest: manifest, installedAt: program.installedAt, lastLaunchedAt: program.lastLaunchedAt)
         try JSONEncoder().encode(updated).write(to: programURL(program.id).appendingPathComponent("installed.json"), options: .atomic)

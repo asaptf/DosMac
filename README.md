@@ -37,6 +37,12 @@ When Setup requests another disk, use the **Floppy drive · A:** panel above the
 
 In graphical Windows Setup, click inside the DOSBox-X screen to capture the mouse. DosMac enables click-to-capture automatically; the standard Windows 3.1 driver requires captured relative input. Press **Ctrl + F10** to release it (**Ctrl + Fn + F10** on some Mac keyboards), or use **Main → Capture mouse** in DOSBox-X. The running-session panel includes these instructions. See [mouse input](docs/mouse-input.md).
 
+## After installing Windows
+
+Stop the current session, select the same library item, and click its gear button. Set **Start in → DOS prompt on C:** and save to open the built-in DOS shell at `C:\>` without running the floppy installer. To start the installed Windows directly, click **Use installed Windows**, then **Save**. DosMac detects `WINDOWS/WIN.COM` and other installed `WIN.COM` entry points. Your installed files stay on the same private C: drive; no reinstallation is needed.
+
+From the DOS prompt, type `CD \WINDOWS` and then `WIN` to start an installation in the default directory. The floppy images remain available if you later choose the installer entry point again, but DOS/installed-Windows startup does not mount them. See [startup modes](docs/startup.md).
+
 ## Build for iPhone
 
 ```sh
