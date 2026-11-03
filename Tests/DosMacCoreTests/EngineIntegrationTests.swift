@@ -7,6 +7,25 @@ struct EngineIntegrationTests {
     @MainActor func realDOSWritesToHostExchange() async throws {
         #if os(macOS)
         let engine = URL(fileURLWithPath: ProcessInfo.processInfo.environment["DOSMAC_TEST_ENGINE"]!)
+        try await verifyExchange(engine: engine)
+        #endif
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["DOSMAC_TEST_ENGINE_DOWNLOAD"] == "1"))
+    @MainActor func automaticEngineDownloadRunsDOSAndCachesOffline() async throws {
+        #if os(macOS)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DosMacDownload-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installer = ManagedEngine(root: root)
+        let engine = try await installer.ensureInstalled { _ in }
+        let cached = try await installer.ensureInstalled { _ in Issue.record("Cached engine unexpectedly downloaded again") }
+        #expect(engine == cached)
+        try await verifyExchange(engine: engine)
+        #endif
+    }
+
+    #if os(macOS)
+    @MainActor private func verifyExchange(engine: URL) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("DosMac-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let package = root.appendingPathComponent("Smoke.dosmac")
@@ -28,6 +47,6 @@ struct EngineIntegrationTests {
         #expect(session.state == .exited(0), Comment(rawValue: log))
         let result = try String(contentsOf: library.exchangeURL.appendingPathComponent("RESULT.TXT"), encoding: .ascii)
         #expect(result.trimmingCharacters(in: .whitespacesAndNewlines) == "DOSMAC_OK")
-        #endif
     }
+    #endif
 }

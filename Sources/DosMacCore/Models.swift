@@ -4,6 +4,7 @@ public enum DosMacError: LocalizedError {
     case invalidPackage(String)
     case alreadyInstalled
     case engineMissing
+    case engineInstallation(String)
     case unsupportedPlatform
     case sessionActive
 
@@ -11,7 +12,8 @@ public enum DosMacError: LocalizedError {
         switch self {
         case .invalidPackage(let reason): "Invalid package: \(reason)"
         case .alreadyInstalled: "This program is already installed."
-        case .engineMissing: "DOSBox-X was not found. Choose its executable in Settings."
+        case .engineMissing: "DOSBox-X is unavailable. Try preparing the engine in Engine settings."
+        case .engineInstallation(let reason): reason
         case .unsupportedPlatform: "The embedded emulator is not available in this iPhone preview yet. Library and file import are available."
         case .sessionActive: "Stop the current session before launching another program."
         }

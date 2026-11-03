@@ -14,9 +14,11 @@ DOSBox-X is the selected initial backend because it documents both [Windows 3.1x
 | Domain | Codable manifests, installed programs, machine profiles | Machine definitions and import migrations |
 | Storage | Actor-owned installation, per-program drives, Exchange | Backups, recovery, uninstall and upgrade transactions |
 | Session | Main-actor external process adapter on macOS | Common backend interface and embedded C ABI |
-| Emulation | Separately installed DOSBox-X | Pinned interpreter core with audited build flags |
+| Emulation | Automatically prepared official DOSBox-X release | Pinned interpreter core with audited build flags |
 
 The first macOS adapter keeps upstream separate and makes the package-to-emulator-to-host-file loop testable immediately. It is not the iOS runtime architecture. iOS cannot use `Process` to launch a downloaded desktop executable.
+
+The managed macOS installer downloads a pinned, architecture-specific upstream release, verifies a source-pinned SHA-256 before extraction, and publishes a versioned directory with a matching receipt. Launch discovers custom, bundled, managed, or existing system engines. See [engine delivery](engine-delivery.md).
 
 ## Embedded core contract to implement
 

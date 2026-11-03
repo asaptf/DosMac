@@ -12,6 +12,7 @@ struct DosMacApp: App {
                 #if os(macOS)
                 .frame(minWidth: 960, minHeight: 680)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    model.cancelEngineSetup()
                     model.session.stop()
                 }
                 #endif
@@ -30,10 +31,17 @@ final class LibraryModel: ObservableObject {
     @Published var error: String?
     @Published var status: SessionState = .idle
     @Published var isInstalling = false
+    @Published var engineProgress: EngineInstallProgress?
+    @Published var isLaunching = false
     @Published var enginePath: String = UserDefaults.standard.string(forKey: "enginePath") ?? "" {
         didSet { UserDefaults.standard.set(enginePath, forKey: "enginePath") }
     }
     let session = EmulatorSession()
+    #if os(macOS)
+    private let engineInstaller = ManagedEngine()
+    private var enginePreparation: Task<URL, Error>?
+    private var enginePreparationID: UUID?
+    #endif
     private(set) var library: LibraryStore?
     var engine: URL? { EmulatorSession.findEngine(customPath: enginePath.isEmpty ? nil : enginePath) }
     var filtered: [InstalledProgram] {
@@ -83,11 +91,71 @@ final class LibraryModel: ObservableObject {
     }
 
     func launch() async {
-        guard let current, let library else { return }
+        guard let current, let library, !isLaunching else { return }
+        isLaunching = true
+        defer { isLaunching = false }
         do {
-            try await session.start(program: current, library: library, engine: engine)
+            let executable = try await prepareEngine()
+            try Task.checkCancellation()
+            try await session.start(program: current, library: library, engine: executable)
             await refresh()
-        } catch { self.error = error.localizedDescription }
+        } catch is CancellationError { }
+        catch let error as URLError where error.code == .cancelled { }
+        catch { self.error = error.localizedDescription }
+    }
+
+    func prepareEngine() async throws -> URL {
+        if let engine { return engine }
+        #if os(macOS)
+        if let enginePreparation { return try await enginePreparation.value }
+        engineProgress = .downloading(nil)
+        let id = UUID()
+        enginePreparationID = id
+        let installer = engineInstaller
+        let preparation = Task {
+            try await installer.ensureInstalled { [weak self] progress in
+                await self?.updateEngineProgress(progress, id: id)
+            }
+        }
+        enginePreparation = preparation
+        defer { enginePreparation = nil; enginePreparationID = nil; engineProgress = nil }
+        return try await preparation.value
+        #else
+        throw DosMacError.unsupportedPlatform
+        #endif
+    }
+
+    func installEngine() async {
+        do { _ = try await prepareEngine() }
+        catch is CancellationError { }
+        catch let error as URLError where error.code == .cancelled { }
+        catch { self.error = error.localizedDescription }
+    }
+
+    func cancelEngineSetup() {
+        #if os(macOS)
+        enginePreparation?.cancel()
+        #endif
+    }
+
+    #if os(macOS)
+    private func updateEngineProgress(_ progress: EngineInstallProgress, id: UUID) {
+        guard enginePreparationID == id else { return }
+        // Download callbacks may arrive after the async download has completed.
+        if case .downloading = progress, let current = engineProgress {
+            if case .verifying = current { return }
+            if case .installing = current { return }
+        }
+        engineProgress = progress
+    }
+    #endif
+
+    var engineStatusLabel: String {
+        #if os(macOS)
+        engineProgress?.message ?? (engine == nil ? "Engine installs on first launch" : "DOSBox-X ready")
+        #else
+        "Embedded engine coming soon"
+        #endif
     }
 
     static let demo = """
@@ -135,7 +203,11 @@ struct LibraryView: View {
                 }
                 Spacer()
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack { Circle().fill(model.engine == nil ? .orange : mint).frame(width: 6, height: 6); Text(model.engine == nil ? "Engine setup needed" : "DOSBox-X detected") }
+                    HStack { Circle().fill(model.engine == nil ? .orange : mint).frame(width: 6, height: 6); Text(model.engineStatusLabel) }
+                    if let progress = model.engineProgress {
+                        ProgressView(value: progress.fraction).progressViewStyle(.linear)
+                        Button("Cancel download") { model.cancelEngineSetup() }
+                    }
                     Text("INTERPRETER · NO JIT").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
                     Text("DEVELOPER PREVIEW  /  0.1").font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary).padding(.top, 12)
                 }.font(.caption)
@@ -193,7 +265,7 @@ struct LibraryView: View {
                             if model.running {
                                 Button("Stop session", role: .destructive) { model.session.stop() }
                             } else {
-                                Button { Task { await model.launch() } } label: { Label("Launch", systemImage: "play.fill") }.buttonStyle(.borderedProminent).tint(mint).foregroundStyle(base)
+                                Button { Task { await model.launch() } } label: { Label(model.isLaunching ? "Preparing…" : "Launch", systemImage: "play.fill") }.buttonStyle(.borderedProminent).tint(mint).foregroundStyle(base).disabled(model.isLaunching || model.engineProgress != nil)
                             }
                         }.padding(20).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
                     }
@@ -254,10 +326,20 @@ struct EngineSettings: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack { Text("Engine & exchange").font(.title2.bold()); Spacer(); Button("Done") { dismiss() } }
             #if os(macOS)
-            Text("DOSBox-X executable").font(.headline)
-            TextField("/Applications/dosbox-x.app/Contents/MacOS/dosbox-x", text: $model.enginePath).textFieldStyle(.roundedBorder)
-            Text(model.engine == nil ? "Install DOSBox-X separately, then select its executable path. Programs open in the emulator's own window." : "Executable found. Sessions use the normal interpreter core.").font(.callout).foregroundStyle(.secondary)
-            Link("Get DOSBox-X", destination: URL(string: "https://dosbox-x.com/")!)
+            Text("DOSBox-X engine").font(.headline)
+            Text(model.engine == nil ? "Just launch a program. DosMac automatically downloads and verifies the official engine once; later launches work offline." : "Ready to run. Sessions use the normal interpreter core and open in the emulator's own window.").font(.callout).foregroundStyle(.secondary)
+            if let progress = model.engineProgress {
+                Text(progress.message).font(.callout)
+                ProgressView(value: progress.fraction).progressViewStyle(.linear)
+                Button("Cancel download") { model.cancelEngineSetup() }
+            } else if model.engine == nil {
+                Button("Prepare engine now") { Task { await model.installEngine() } }
+            }
+            DisclosureGroup("Advanced: custom engine") {
+                TextField("Optional DOSBox-X executable path", text: $model.enginePath).textFieldStyle(.roundedBorder)
+                Text("Leave empty for automatic setup. The engine is stored privately in DosMac's Application Support folder.").font(.caption).foregroundStyle(.secondary)
+            }
+            Link("DOSBox-X source & license", destination: URL(string: "https://github.com/joncampbell123/dosbox-x/releases/tag/dosbox-x-v2026.10.01")!)
             #else
             Text("iPhone preview").font(.headline)
             Text("Library installation works on this device. Running DOS requires the planned embedded interpreter; this build cannot run programs on iPhone.").foregroundStyle(.secondary)

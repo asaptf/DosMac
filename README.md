@@ -2,7 +2,7 @@
 
 A native home for DOS software on Mac and iPhone.
 
-**Status: 0.1 developer preview.** macOS launches a separately installed DOSBox-X in its own window. The iOS app builds and manages the library and Exchange files, but **does not run DOS yet**. No Windows installation has been tested in DosMac. This is the first working product slice, not a complete emulator release.
+**Status: 0.1 developer preview.** macOS automatically prepares DOSBox-X on first launch and runs it in its own window. The iOS app builds and manages the library and Exchange files, but **does not run DOS yet**. No Windows installation has been tested in DosMac. This is the first working product slice, not a complete emulator release.
 
 ## Run on Mac
 
@@ -23,10 +23,11 @@ xcodebuild -project DosMac.xcodeproj -scheme DosMac-macOS \
 open build/macOS/Build/Products/Debug/DosMac.app
 ```
 
-1. Install [DOSBox-X](https://dosbox-x.com/). DosMac detects common application and Homebrew paths. A custom executable can be selected in **Engine settings**.
-2. Click **Install Hello, DOS**. This installs an original, redistributable batch demo with one click.
-3. Select the program and click **Launch**. The real emulator opens in a separate window.
-4. Open **Exchange**. The demo creates `HELLO.TXT` through guest drive `D:`.
+1. Click **Install Hello, DOS**. This installs an original, redistributable batch demo with one click.
+2. Select the program and click **Launch**. On the first launch, DosMac downloads the official DOSBox-X release for your Mac, verifies its pinned SHA-256, and installs it privately. Progress and cancellation appear in the sidebar. The program then opens in the emulator's own window.
+3. Open **Exchange**. The demo creates `HELLO.TXT` through guest drive `D:`.
+
+No separate DOSBox-X installation, Homebrew, administrator password, or executable-path selection is needed. The initial download is approximately 90 MiB on Apple Silicon or 98 MiB on Intel. Later launches use the cached engine offline. **Engine settings → Prepare engine now** can prepare it ahead of time. If downloading fails, retry **Launch**. Existing system engines and optional custom paths remain supported. See [engine delivery](docs/engine-delivery.md).
 
 Use **Import package** to select a `.dosmac` directory. The example at `Examples/HelloDOS.dosmac` is also importable. Packages are copied to application storage; originals are not modified. Duplicate installs are rejected rather than overwriting user data.
 
@@ -55,6 +56,7 @@ Open `DosMac.xcodeproj`, choose `DosMac-iOS`, select a simulator or configure yo
 - ZIP and supported 7z archive extraction with path/type/count/declared-size validation.
 - Floppy-media preparation and editable startup programs after guest installation.
 - macOS DOSBox-X process lifecycle, stop control, generated configuration, and session logs.
+- Automatic, checksum-verified engine preparation, cancellation/retry, offline reuse, and bundled-engine discovery.
 - DOS/386 and Windows 3.1/486 configuration profiles using `core=normal` (interpreter).
 
 ## Verification
@@ -63,6 +65,8 @@ Open `DosMac.xcodeproj`, choose `DosMac-iOS`, select a simulator or configure yo
 swift test
 # Optional real-engine integration test; opens and closes an emulator window:
 DOSMAC_TEST_ENGINE=/absolute/path/to/dosbox-x swift test
+# Optional full engine download/install/offline-cache/DOS execution test (~90–98 MiB):
+DOSMAC_TEST_ENGINE_DOWNLOAD=1 swift test
 # Optional live WinWorld metadata test (does not download software):
 DOSMAC_TEST_WINWORLD=1 swift test
 # Optional download/checksum/extraction test of the Windows 3.1 floppy archive:

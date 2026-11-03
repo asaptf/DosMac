@@ -4,6 +4,7 @@
 
 - [x] Native library, package installation, search and persisted state.
 - [x] Real DOSBox-X launch with interpreted 386/486 profiles.
+- [x] Automatic engine download, pinned checksum verification, private installation and offline cache.
 - [x] Private program drive and shared Exchange directory.
 - [x] Native iOS library and Exchange import/export build.
 - [x] WinWorld metadata/mirror import and direct HTTPS ZIP/7z/DOS-file import.

@@ -18,7 +18,8 @@ public final class EmulatorSession {
 
     public static func findEngine(customPath: String? = nil) -> URL? {
         #if os(macOS)
-        let candidates = [customPath, ProcessInfo.processInfo.environment["DOSMAC_ENGINE_PATH"], "/Applications/dosbox-x.app/Contents/MacOS/dosbox-x", "/Applications/DOSBox-X.app/Contents/MacOS/dosbox-x", "/opt/homebrew/bin/dosbox-x", "/usr/local/bin/dosbox-x"].compactMap { $0 }
+        let bundled = Bundle.main.resourceURL?.appendingPathComponent("Emulator/dosbox-x.app/Contents/MacOS/dosbox-x").path
+        let candidates = [customPath, ProcessInfo.processInfo.environment["DOSMAC_ENGINE_PATH"], bundled, ManagedEngine.cachedExecutable()?.path, "/Applications/dosbox-x.app/Contents/MacOS/dosbox-x", "/Applications/DOSBox-X.app/Contents/MacOS/dosbox-x", "/opt/homebrew/bin/dosbox-x", "/usr/local/bin/dosbox-x"].compactMap { $0 }
         return candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }).map { URL(fileURLWithPath: $0) }
         #else
         return nil

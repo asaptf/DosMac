@@ -30,4 +30,4 @@ SOFTWARE.
 
 ## DOSBox-X
 
-DosMac's macOS adapter invokes a separately installed [DOSBox-X](https://github.com/joncampbell123/dosbox-x). It is not linked, bundled, or redistributed here. Its GPL license and accompanying notices apply to that installation. A future embedded release must audit the selected upstream revision and linked components and ship all corresponding notices and required source.
+DosMac's macOS adapter invokes [DOSBox-X](https://github.com/joncampbell123/dosbox-x), automatically downloaded from the official 2026.10.01 release or supplied by the user. No DOSBox-X binary is linked, bundled, or redistributed in this repository. The managed download retains the upstream app, COPYING.txt, README.txt, and other accompanying files. Its GPL license and notices apply to that installation. [Release and source](https://github.com/joncampbell123/dosbox-x/releases/tag/dosbox-x-v2026.10.01). A future bundled or embedded release must audit the selected upstream revision and linked components and ship all corresponding notices and required source.
