@@ -1,0 +1,3 @@
+# Examples
+
+The original HelloDOS manifest and batch program are dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). They do not contain third-party DOS or Windows binaries.

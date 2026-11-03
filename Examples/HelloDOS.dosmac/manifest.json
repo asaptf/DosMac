@@ -1,0 +1,11 @@
+{
+  "formatVersion": 1,
+  "id": "org.dosmac.hello",
+  "title": "Hello, DOS",
+  "summary": "A tiny original demo. Write a greeting to the host through drive D:.",
+  "version": "1.0",
+  "author": "DosMac",
+  "license": "CC0-1.0",
+  "executable": "HELLO.BAT",
+  "profile": "dos"
+}

@@ -1,0 +1,17 @@
+name: Build and test
+on: [push, pull_request]
+jobs:
+  apple:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test core and build SwiftUI executable
+        run: swift test
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate application projects
+        run: xcodegen generate
+      - name: Build macOS app
+        run: xcodebuild -project DosMac.xcodeproj -scheme DosMac-macOS -configuration Debug -derivedDataPath build/macOS CODE_SIGNING_ALLOWED=NO build
+      - name: Build iPhone simulator app
+        run: xcodebuild -project DosMac.xcodeproj -scheme DosMac-iOS -sdk iphonesimulator -configuration Debug -derivedDataPath build/iOS CODE_SIGNING_ALLOWED=NO build

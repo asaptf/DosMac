@@ -1,0 +1,43 @@
+name: DosMac
+options:
+  bundleIdPrefix: org.dosmac
+  deploymentTarget:
+    macOS: '14.0'
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    GENERATE_INFOPLIST_FILE: YES
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: '0.1.0'
+packages:
+  DosMac:
+    path: .
+targets:
+  DosMac-macOS:
+    type: application
+    platform: macOS
+    sources: [Sources/DosMacApp]
+    dependencies:
+      - package: DosMac
+        product: DosMacCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app
+        PRODUCT_NAME: DosMac
+        ENABLE_APP_SANDBOX: NO
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+  DosMac-iOS:
+    type: application
+    platform: iOS
+    sources: [Sources/DosMacApp]
+    dependencies:
+      - package: DosMac
+        product: DosMacCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app
+        PRODUCT_NAME: DosMac
+        TARGETED_DEVICE_FAMILY: '1,2'
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
