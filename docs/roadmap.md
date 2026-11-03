@@ -19,12 +19,14 @@ The primary direction is now [managed PC machines](machine-architecture.md). The
 ### Finish the reference stack
 
 - [x] Windows 3.1 SETUP.SHH generation, automatic source staging and installed-file verification.
-- [ ] Word 6 installer recipe, required identity/license inputs and successful app-launch verification.
+- [x] Word 6 nine-disk recipe, SHARE prerequisite, recognized completion notice, and verified app launch.
+- [x] A real Word document saved to the exchange floppy and exported to macOS.
+- [ ] Custom owner/organization inputs and review flows for additional releases.
 - [ ] Persisted recovery checkpoints before each installation stage.
 - [ ] Resume prepared workflows after interruption without duplicate downloads or machines.
 - [x] User-facing persistent FAT12 exchange floppies with Mac import and root-file export.
 
-Exit: one prepared recipe installs all three products, boots from HDD, launches Word, saves a document, and exports it to macOS. This exit has not been reached yet.
+Exit: one prepared recipe installs all three products, boots from HDD, launches Word, saves a document, and exports it to macOS. Locally verified on 2026-11-03 against the selected English releases: installation on a blank HDD, cold boot, Word startup, document save, and host export. The clean installation took about six minutes. The final repeat reused privately prepared media after WinWorld returned HTTP 429.
 
 ### Extend and release
 
