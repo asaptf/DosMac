@@ -1,6 +1,45 @@
 # Roadmap and acceptance criteria
 
-## M1 — macOS vertical slice (current)
+## Active QEMU roadmap
+
+The primary direction is now [managed PC machines](machine-architecture.md). The first reference stack, selected by the user, is **MS-DOS 6.22 → Windows 3.1 Retail → Word 6**.
+
+### PC platform foundation
+
+- [x] Separate machine records and owned QCOW2 HDDs.
+- [x] QMP lifecycle, pause/resume, reset, floppy and CD insertion/ejection.
+- [x] Native in-app RFB framebuffer and direct guest keyboard/mouse input.
+- [x] Private process-pipe/UNIX-socket control, with no Accessibility dependency.
+- [x] Local developer engine bundling, including dylibs, BIOS and VNC keymaps.
+- [x] Original boot-sector integration test against the real bundled engine.
+- [x] First reference-media provisioner and grouped disk sets.
+- [x] Real MS-DOS 6.22 unattended recipe test: blank HDD, disk changes, reboot and version verification.
+- [x] Visual review of the native machine window, bundled BIOS display, and power controls.
+
+### Finish the reference stack
+
+- [x] Windows 3.1 SETUP.SHH generation, automatic source staging and installed-file verification.
+- [ ] Word 6 installer recipe, required identity/license inputs and successful app-launch verification.
+- [ ] Persisted recovery checkpoints before each installation stage.
+- [ ] Resume prepared workflows after interruption without duplicate downloads or machines.
+- [x] User-facing persistent FAT12 exchange floppies with Mac import and root-file export.
+
+Exit: one prepared recipe installs all three products, boots from HDD, launches Word, saves a document, and exports it to macOS. This exit has not been reached yet.
+
+### Extend and release
+
+- [ ] PC DOS compatibility and installation recipes.
+- [ ] Windows 95 and 98 CD/boot-floppy variants, unattended files and verified driver sets.
+- [ ] Application recipes for additional Word/Office versions, tied to exact source media.
+- [ ] Signed/notarized self-contained engine distributions, complete license/source packages, Intel validation.
+- [ ] Embedded no-JIT iPhone runtime and physical-device performance/lifecycle testing.
+- [ ] Semantic MCP service over the same machine API, after operations and recovery are stable.
+
+## Archived DOSBox milestones
+
+The following describes the retained Legacy DOSBox backend. It is not the primary runtime plan.
+
+### M1 — macOS vertical slice
 
 - [x] Native library, package installation, search and persisted state.
 - [x] Real DOSBox-X launch with interpreted 386/486 profiles.

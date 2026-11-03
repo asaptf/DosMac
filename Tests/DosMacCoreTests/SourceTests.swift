@@ -51,10 +51,15 @@ struct SourceTests {
         #expect(releases[0].title == "DOS & tools")
         #expect(releases[0].downloadURL == nil)
         let hash = String(repeating: "a", count: 128)
-        let download = "<h1>DOS &amp; tools</h1><a href='/download/first/from/mirror'>Download</a><code>\(hash)</code>"
+        let download = "<h1>DOS &amp; tools</h1><a href='/download/first/from/mirror'>Download</a><dt>Checksum</dt><dd><tt>\(hash)</tt></dd>"
         let mirrors = try SoftwareSources.parseWinWorld(html: download, page: releases[0].pageURL)
         #expect(mirrors[0].downloadURL?.path == "/download/first/from/mirror")
         #expect(mirrors[0].sha512 == hash)
+        let oldHash = String(repeating: "b", count: 40)
+        let legacy = download.replacingOccurrences(of: hash, with: oldHash)
+        let legacyMirror = try SoftwareSources.parseWinWorld(html: legacy, page: releases[0].pageURL)[0]
+        #expect(legacyMirror.sha1 == oldHash)
+        #expect(legacyMirror.sha512 == nil)
     }
 
     @Test(arguments: ["../SECRET", "/etc/passwd", "C:\\AUTOEXEC.BAT", "dir/../../escape", "dir\\..\\escape", "a//b", "a/./b", "bad\nfile"])

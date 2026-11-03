@@ -8,12 +8,14 @@ public struct RemoteRelease: Identifiable, Sendable {
     public let pageURL: URL
     public let downloadURL: URL?
     public let sha512: String?
+    public let sha1: String?
 
-    public init(title: String, pageURL: URL, downloadURL: URL? = nil, sha512: String? = nil) {
+    public init(title: String, pageURL: URL, downloadURL: URL? = nil, sha512: String? = nil, sha1: String? = nil) {
         self.title = title
         self.pageURL = pageURL
         self.downloadURL = downloadURL
         self.sha512 = sha512
+        self.sha1 = sha1
     }
 }
 
@@ -69,8 +71,8 @@ public actor SoftwareSources {
         let title = firstMatch("(?is)<h1[^>]*>(.*?)</h1>", in: html).map(plainText) ?? "WinWorld software"
         let mirrors = links.filter { isWinWorld($0.0) && $0.0.path.contains("/from/") }
         if let mirror = mirrors.first {
-            let hash = firstMatch("(?i)\\b([a-f0-9]{128})\\b", in: html)?.lowercased()
-            return [RemoteRelease(title: title, pageURL: page, downloadURL: mirror.0, sha512: hash)]
+            let checksum = firstMatch("(?is)<dt[^>]*>\\s*Checksum\\s*</dt>\\s*<dd[^>]*>\\s*(?:<[^>]+>)*\\s*([a-f0-9]{40,128})", in: html)?.lowercased()
+            return [RemoteRelease(title: title, pageURL: page, downloadURL: mirror.0, sha512: checksum?.count == 128 ? checksum : nil, sha1: checksum?.count == 40 ? checksum : nil)]
         }
         var seen = Set<String>()
         let releases = links.filter { isWinWorld($0.0) && $0.0.path.hasPrefix("/download/") && !$0.0.path.contains("/from/") && seen.insert($0.0.absoluteString).inserted }
@@ -92,6 +94,10 @@ public actor SoftwareSources {
         if let hash = resolved.sha512 {
             let actual = SHA512.hash(data: data).map { String(format: "%02x", $0) }.joined()
             guard actual == hash else { throw DosMacError.invalidPackage("source SHA-512 checksum did not match") }
+        }
+        if let hash = resolved.sha1 {
+            let actual = Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            guard actual == hash else { throw DosMacError.invalidPackage("source SHA-1 checksum did not match") }
         }
         return try prepareArchive(data: data, release: resolved)
     }

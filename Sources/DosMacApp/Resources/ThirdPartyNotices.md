@@ -1,5 +1,9 @@
 # Third-party notices
 
+## QEMU machine backend
+
+The new machine manager invokes QEMU as an owned process and implements QMP/RFB protocols in Swift. No QEMU source or OS/application image is vendored in this repository. The local developer bundling script copies a developer-installed QEMU and its runtime dependencies into a local build artifact; this is not a publicly redistributable release package. QEMU, SeaBIOS, VGA BIOS and each linked library retain their own licenses. Before binary distribution, provide the applicable notices and corresponding source and complete signing/notarization. Sources: [QEMU](https://www.qemu.org/), [QEMU licensing](https://www.qemu.org/docs/master/about/license.html), [SeaBIOS](https://www.seabios.org/).
+
 ## SWCompression 4.9.1 and BitByteData 2.1.0
 
 Source: [SWCompression](https://github.com/tsolomko/SWCompression) and [BitByteData](https://github.com/tsolomko/BitByteData). Versions and revisions are pinned by `Package.resolved`.

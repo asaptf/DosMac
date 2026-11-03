@@ -21,6 +21,8 @@ targets:
     dependencies:
       - package: DosMac
         product: DosMacCore
+      - package: DosMac
+        product: DosMacVM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app
@@ -34,6 +36,8 @@ targets:
     dependencies:
       - package: DosMac
         product: DosMacCore
+      - package: DosMac
+        product: DosMacVM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app

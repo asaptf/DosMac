@@ -1,5 +1,7 @@
 # Architecture
 
+**Current direction:** the primary product is now a managed QEMU PC with native display and direct machine control. Read [managed PC architecture](machine-architecture.md) first. The remainder documents the retained Legacy DOSBox backend and its existing package format, not the new machine runtime.
+
 ## Decision: reuse a mature x86 machine emulator
 
 DOS programs execute x86 instructions and may access PC hardware directly. Windows 3.1 also requires protected-mode CPU, memory, video, interrupt, and DOS behavior. Windows 9x adds disk boot, IDE, BIOS and driver compatibility requirements. Reimplementing all of this before delivering a usable application would be a separate multi-year emulator project.

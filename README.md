@@ -1,10 +1,26 @@
 # DosMac
 
-A native home for DOS software on Mac and iPhone.
+A native manager for complete retro PCs on Mac, with a future iPhone runtime.
 
-**Status: 0.1 developer preview.** macOS automatically prepares DOSBox-X on first launch and runs it in its own window. The iOS app builds and manages the library and Exchange files, but **does not run DOS yet**. No Windows installation has been tested in DosMac. This is the first working product slice, not a complete emulator release.
+**Status: developer preview.** The new **Machines** tab uses QEMU: real BIOS boot, a private QCOW2 hard disk, floppy and IDE CD-ROM devices, native in-app display, and direct keyboard/mouse/media control. Profiles cover DOS, Windows 3.1, 95 and 98, but compatibility validation is incomplete. The first reference workflow is **MS-DOS 6.22 → Windows 3.1 Retail → Word 6**. The reference recipe downloads the pinned media and runs version-specific DOS, Windows and Word installers; broad OS compatibility and recovery are still being developed. The **Legacy DOSBox** tab retains existing program installations. iPhone execution is not implemented yet.
 
-## Run on Mac
+## New machine workspace
+
+Create a blank machine, import raw floppy images or ISO media, choose its boot device, and start it. Insert/eject media in the machine panel while running. Input stays inside DosMac; no Accessibility permission is needed. Click the guest screen to capture input and press **Control + Option** to release it. Shut down the guest OS before powering off.
+
+For the first reference stack, **Install DOS 6.22 + Windows 3.1 + Word 6** creates an isolated machine, downloads the specific user-requested disk sets, and runs the installation stages in order. DOS Setup uses confirmed disk changes; Windows 3.1 uses its SETUP.SHH answer file; Word preserves its required DISK1–DISK9 source layout. The default installation identity is “DosMac User”. Unknown DOS prompts or recognized graphical errors stop the assistant for attention. Installed status requires guest-side file checks. See [managed PC architecture](docs/machine-architecture.md) for the exact implemented scope and remaining automation.
+
+After installation, **Start machine** opens DOS from the HDD; **Start Windows** and **Start Word 6** launch the installed software. To exchange files, create an empty floppy or choose **Mac files → exchange floppy…**, start the machine, and insert that floppy into A:. After shutting down the guest and powering off, choose **Export files…**. This first exchange workflow supports root files, DOS 8.3 names using letters/digits/underscores, and 1.44 MB capacity.
+
+The developer build can use a local QEMU 9.2 or newer installation, or an explicit `DOSMAC_QEMU_PATH=/absolute/path/to/qemu-system-i386`. To assemble a self-contained local macOS build after building the app:
+
+```sh
+python3 scripts/bundle-qemu.py --app build/macOS/Build/Products/Debug/DosMac.app
+```
+
+The resulting app carries its engine, dylibs, firmware and keymaps. This is a local development bundle; public binary distribution still needs the license/source and notarization work documented in the architecture. No commercial OS or application image is bundled.
+
+## Build on Mac
 
 Requires Xcode 16 or newer and macOS 14 or newer.
 
@@ -22,6 +38,8 @@ xcodebuild -project DosMac.xcodeproj -scheme DosMac-macOS \
   -configuration Debug -derivedDataPath build/macOS CODE_SIGNING_ALLOWED=NO build
 open build/macOS/Build/Products/Debug/DosMac.app
 ```
+
+The following instructions describe the retained **Legacy DOSBox** tab:
 
 1. Click **Install Hello, DOS**. This installs an original, redistributable batch demo with one click.
 2. Select the program and click **Launch**. On the first launch, DosMac downloads the official DOSBox-X release for your Mac, verifies its pinned SHA-256, and installs it privately. Progress and cancellation appear in the sidebar. The program then opens in the emulator's own window.
