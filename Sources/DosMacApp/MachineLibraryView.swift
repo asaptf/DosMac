@@ -110,6 +110,32 @@ final class MachineLibraryModel: ObservableObject {
         catch { self.error = error.localizedDescription }
         #endif
     }
+    func launchApplication(_ app: GuestApplication) async {
+        #if os(macOS)
+        guard !busy, let store, let machine = machines.first(where: { $0.id == app.machineID }) else { return }
+        guard !active || selected == app.machineID else { error = "Close the current computer before opening another one."; return }
+        busy = true; defer { busy = false }
+        do {
+            try app.validate()
+            selected = machine.id
+            if !active {
+                image = nil
+                var boot = machine; boot.boot = .hardDisk
+                if app.bootFromMedia == true {
+                    guard !app.mediaIDs.isEmpty else { throw VMError.invalid("This installer has no boot disk.") }
+                    boot.boot = .floppy
+                    boot.floppies = app.mediaIDs.compactMap { id in machine.floppies.first { $0.id == id } } + machine.floppies.filter { !app.mediaIDs.contains($0.id) }
+                }
+                try await session.start(boot, directory: store.directory(for: machine.id))
+                if app.bootFromMedia == true { return }
+                try await session.waitForDOSPrompt()
+            }
+            guard try await session.isAtDOSPrompt() else { throw VMError.invalid("Open the computer and return to the DOS prompt before starting this installer or app.") }
+            if let id = app.mediaIDs.first, let disk = machine.floppies.first(where: { $0.id == id }) { try await session.insert(disk, cdrom: false) }
+            try await session.typeText(GuestApplication.command(executable: app.executable, windows: app.windows))
+        } catch { self.error = error.localizedDescription }
+        #endif
+    }
     func eject(cdrom: Bool) async {
         #if os(macOS)
         do { try await session.eject(cdrom: cdrom); objectWillChange.send() }
@@ -246,6 +272,8 @@ final class MachineLibraryModel: ObservableObject {
 struct MachineLibraryView: View {
     private enum ImportAction { case floppy, cdrom, exchangeFiles, export(MachineMedia) }
     @ObservedObject var model: MachineLibraryModel
+    var embedded = false
+    var createOnAppear = false
     @State private var creating = false
     @State private var importing = false
     @State private var importAction: ImportAction = .floppy
@@ -256,7 +284,61 @@ struct MachineLibraryView: View {
     @State private var confirmReset = false
 
     var body: some View {
-        NavigationSplitView {
+        Group {
+            if embedded { detailContent }
+            else { NavigationSplitView { computerSidebar } detail: { detailContent } }
+        }
+        .onAppear { if createOnAppear { creating = true } }
+        .sheet(isPresented: $creating) {
+            NavigationStack {
+                Form {
+                    TextField("Name", text: $newName)
+                    Picker("System profile", selection: $guest) { ForEach(GuestSystem.allCases, id: \.self) { Text($0.title).tag($0) } }
+                    Text("Creates a blank virtual hard disk. Supply your installation images next. Profiles are hardware presets; OS compatibility is still being validated.").font(.caption).foregroundStyle(.secondary)
+                }.padding(20).navigationTitle("New machine")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { creating = false } }
+                        ToolbarItem(placement: .confirmationAction) { Button("Create") { creating = false; Task { await model.create(name: newName, guest: guest) } }.disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty) }
+                    }
+            }
+            #if os(macOS)
+            .frame(width: 500, height: 270)
+            #endif
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: importingFolder ? [.folder] : [.data], allowsMultipleSelection: !importingFolder) { result in
+            do {
+                let urls = try result.get()
+                switch importAction {
+                case .floppy: Task { await model.importMedia(urls, cdrom: false) }
+                case .cdrom: Task { await model.importMedia(urls, cdrom: true) }
+                case .exchangeFiles: Task { await model.makeExchange(urls) }
+                case .export(let media): if let destination = urls.first { Task { await model.exportExchange(media, destination: destination) } }
+                }
+            }
+            catch { model.error = error.localizedDescription }
+        }
+        .alert("Machine", isPresented: Binding(get: { !embedded && (model.error != nil || model.notice != nil) }, set: { if !$0 && !embedded { model.error = nil; model.notice = nil } })) { Button("OK") { model.error = nil; model.notice = nil } } message: { Text(model.error ?? model.notice ?? "") }
+        .confirmationDialog("Power off this machine? Shut down the guest OS first to protect its disk.", isPresented: $confirmPowerOff) {
+            Button("Power off", role: .destructive) {
+                #if os(macOS)
+                model.cancelAssistant()
+                Task { await model.session.powerOff() }
+                #endif
+            }
+        }
+        .confirmationDialog("Reset this machine? Unsaved guest work will be lost.", isPresented: $confirmReset) {
+            Button("Reset machine", role: .destructive) {
+                #if os(macOS)
+                Task { do { try await model.session.reset() } catch { model.error = error.localizedDescription } }
+                #endif
+            }
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.terminate() }
+        #endif
+    }
+
+    private var computerSidebar: some View {
             List(selection: $model.selected) {
                 Section("Your machines") {
                     ForEach(model.machines) { machine in
@@ -271,7 +353,9 @@ struct MachineLibraryView: View {
                         Button("Create a blank machine") { creating = true }
                     } label: { Label("New machine", systemImage: "plus") }.disabled(model.active || model.busy)
                 }
-        } detail: {
+    }
+
+    @ViewBuilder private var detailContent: some View {
             if let machine = model.current {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -343,54 +427,6 @@ struct MachineLibraryView: View {
                     if let message = model.operationMessage { ProgressView(message) }
                 }
             }
-        }
-        .sheet(isPresented: $creating) {
-            NavigationStack {
-                Form {
-                    TextField("Name", text: $newName)
-                    Picker("System profile", selection: $guest) { ForEach(GuestSystem.allCases, id: \.self) { Text($0.title).tag($0) } }
-                    Text("Creates a blank virtual hard disk. Supply your installation images next. Profiles are hardware presets; OS compatibility is still being validated.").font(.caption).foregroundStyle(.secondary)
-                }.padding(20).navigationTitle("New machine")
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { creating = false } }
-                        ToolbarItem(placement: .confirmationAction) { Button("Create") { creating = false; Task { await model.create(name: newName, guest: guest) } }.disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty) }
-                    }
-            }
-            #if os(macOS)
-            .frame(width: 500, height: 270)
-            #endif
-        }
-        .fileImporter(isPresented: $importing, allowedContentTypes: importingFolder ? [.folder] : [.data], allowsMultipleSelection: !importingFolder) { result in
-            do {
-                let urls = try result.get()
-                switch importAction {
-                case .floppy: Task { await model.importMedia(urls, cdrom: false) }
-                case .cdrom: Task { await model.importMedia(urls, cdrom: true) }
-                case .exchangeFiles: Task { await model.makeExchange(urls) }
-                case .export(let media): if let destination = urls.first { Task { await model.exportExchange(media, destination: destination) } }
-                }
-            }
-            catch { model.error = error.localizedDescription }
-        }
-        .alert("Machine", isPresented: Binding(get: { model.error != nil || model.notice != nil }, set: { if !$0 { model.error = nil; model.notice = nil } })) { Button("OK") { model.error = nil; model.notice = nil } } message: { Text(model.error ?? model.notice ?? "") }
-        .confirmationDialog("Power off this machine? Shut down the guest OS first to protect its disk.", isPresented: $confirmPowerOff) {
-            Button("Power off", role: .destructive) {
-                #if os(macOS)
-                model.cancelAssistant()
-                Task { await model.session.powerOff() }
-                #endif
-            }
-        }
-        .confirmationDialog("Reset this machine? Unsaved guest work will be lost.", isPresented: $confirmReset) {
-            Button("Reset machine", role: .destructive) {
-                #if os(macOS)
-                Task { do { try await model.session.reset() } catch { model.error = error.localizedDescription } }
-                #endif
-            }
-        }
-        #if os(macOS)
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.terminate() }
-        #endif
     }
 
     @ViewBuilder private func mediaSection(_ media: [MachineMedia], cdrom: Bool) -> some View {

@@ -2,15 +2,21 @@
 
 A native manager for complete retro PCs on Mac, with a future iPhone runtime.
 
-**Status: developer preview.** The new **Machines** tab uses QEMU: real BIOS boot, a private QCOW2 hard disk, floppy and IDE CD-ROM devices, native in-app display, and direct keyboard/mouse/media control. Profiles cover DOS, Windows 3.1, 95 and 98, but compatibility validation is incomplete. The first reference workflow is **MS-DOS 6.22 → Windows 3.1 Retail → Word 6**. The reference recipe downloads the pinned media and runs version-specific DOS, Windows and Word installers; broad OS compatibility and recovery are still being developed. The **Legacy DOSBox** tab retains existing program installations. iPhone execution is not implemented yet.
+**Status: developer preview.** Library is the app's home: installed Word/Windows shortcuts, your own guest apps, and existing imported packages share the same searchable collection. Complete PCs run through the included QEMU engine. iPhone execution is not implemented yet; its library and source UI build remains available.
 
-## New machine workspace
+## Your workspace
 
-Create a blank machine, import raw floppy images or ISO media, choose its boot device, and start it. Insert/eject media in the machine panel while running. Input stays inside DosMac; no Accessibility permission is needed. Click the guest screen to capture input and press **Control + Option** to release it. Shut down the guest OS before powering off.
+- **Library** — open Word or Windows directly, search installed apps, import a `.dosmac` package, or add/edit a shortcut to an app already installed inside a computer. Existing imported packages remain available through classic DOS compatibility.
+- **Discover** — search WinWorld and Internet Archive, choose a release, or paste a direct HTTPS link. Downloads can be added to Library and optionally opened immediately. Source availability and rate limits are shown without hiding results from the other provider.
+- **Now playing** — the guest screen and playback controls stay together. Use **Disks** to insert, eject or advance installation media. An installer's own disk order is remembered. Browsing Library or Discover keeps the session alive; click its sidebar card to return.
+- **Files** — prepare/export a computer's exchange floppies, or use the shared D: folder for imported packages. Native transfer disks support root files, strict DOS 8.3 names, and 1.44 MB capacity; export them after shutting down the guest and powering off.
+- **Computers** — create a blank PC or change its hardware/boot/media settings. These controls are secondary to the app library.
 
-For the first reference stack, **Install DOS 6.22 + Windows 3.1 + Word 6** creates an isolated machine, downloads the specific user-requested disk sets, and runs the installation stages in order. DOS Setup uses confirmed disk changes; Windows 3.1 uses its SETUP.SHH answer file; Word preserves its required DISK1–DISK9 source layout. The default installation identity is “DosMac User”. Unknown DOS prompts or recognized graphical errors stop the assistant for attention. Installed status requires guest-side file checks. See [managed PC architecture](docs/machine-architecture.md) for the exact implemented scope and remaining automation.
+Use **⌘F** to focus search, and **⌘1–⌘4** for Library, Discover, Files and Computers. Click the guest screen to capture input; **Control + Option** releases it.
 
-After installation, **Start machine** opens DOS from the HDD; **Start Windows** and **Start Word 6** launch the installed software. To exchange files, create an empty floppy or choose **Mac files → exchange floppy…**, start the machine, and insert that floppy into A:. After shutting down the guest and powering off, choose **Export files…**. This first exchange workflow supports root files, DOS 8.3 names using letters/digits/underscores, and 1.44 MB capacity.
+The featured **Windows 3.1 + Word 6** collection installs pinned English releases of MS-DOS 6.22, Windows 3.1 Retail and Word 6 in a private computer. Its default installation identity is “DosMac User”. The recipe has been verified on an empty HDD, through cold boot, actual Word startup, document save and host export. Other releases can be added as setup disks and opened from Library; their guest installers may require manual interaction. Preparing media is labelled **Setup ready**, not installed software. Password-protected archives and catalog CD downloads are not supported; local ISO files can be imported in computer settings.
+
+The current PCs have BIOS boot, owned QCOW2 disks, floppy/IDE CD-ROM, native display and direct input. Profiles for 95/98 are hardware presets; compatibility and automatic setup for those systems remain unvalidated. See [workspace behavior](docs/workspace.md) and [managed PC architecture](docs/machine-architecture.md).
 
 The developer build can use a local QEMU 9.2 or newer installation, or an explicit `DOSMAC_QEMU_PATH=/absolute/path/to/qemu-system-i386`. To assemble a self-contained local macOS build after building the app:
 
@@ -39,11 +45,11 @@ xcodebuild -project DosMac.xcodeproj -scheme DosMac-macOS \
 open build/macOS/Build/Products/Debug/DosMac.app
 ```
 
-The following instructions describe the retained **Legacy DOSBox** tab:
+The following is a compatibility reference for existing **imported packages**:
 
 1. Click **Install Hello, DOS**. This installs an original, redistributable batch demo with one click.
 2. Select the program and click **Launch**. On the first launch, DosMac downloads the official DOSBox-X release for your Mac, verifies its pinned SHA-256, and installs it privately. Progress and cancellation appear in the sidebar. The program then opens in the emulator's own window.
-3. Open **Exchange**. The demo creates `HELLO.TXT` through guest drive `D:`.
+3. Open **Files → Imported packages · D:**. The demo creates `HELLO.TXT` through guest drive `D:`.
 
 No separate DOSBox-X installation, Homebrew, administrator password, or executable-path selection is needed. The initial download is approximately 90 MiB on Apple Silicon or 98 MiB on Intel. Later launches use the cached engine offline. **Engine settings → Prepare engine now** can prepare it ahead of time. If downloading fails, retry **Launch**. Existing system engines and optional custom paths remain supported. See [engine delivery](docs/engine-delivery.md).
 
@@ -57,7 +63,7 @@ In graphical Windows Setup, click inside the DOSBox-X screen to capture the mous
 
 ## After installing Windows
 
-Stop the current session, select the same library item, and click its gear button. Set **Start in → DOS prompt on C:** and save to open the built-in DOS shell at `C:\>` without running the floppy installer. To start the installed Windows directly, click **Use installed Windows**, then **Save**. DosMac detects `WINDOWS/WIN.COM` and other installed `WIN.COM` entry points. Your installed files stay on the same private C: drive; no reinstallation is needed.
+Stop the current session, select the same library item, and choose **Startup settings** from its context menu. Set **Start in → DOS prompt on C:** and save to open the built-in DOS shell at `C:\>` without running the floppy installer. To start the installed Windows directly, click **Use installed Windows**, then **Save**. DosMac detects `WINDOWS/WIN.COM` and other installed `WIN.COM` entry points. Your installed files stay on the same private C: drive; no reinstallation is needed.
 
 From the DOS prompt, type `CD \WINDOWS` and then `WIN` to start an installation in the default directory. The floppy images remain available if you later choose the installer entry point again, but DOS/installed-Windows startup does not mount them. See [startup modes](docs/startup.md).
 

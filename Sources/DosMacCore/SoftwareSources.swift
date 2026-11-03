@@ -58,12 +58,66 @@ public actor SoftwareSources {
 
     public func inspect(_ url: URL) async throws -> [RemoteRelease] {
         try Self.validateURL(url)
+        if url.host?.lowercased() == "archive.org", url.pathComponents.count == 3, url.pathComponents[1] == "details" {
+            let identifier = url.lastPathComponent
+            let metadata = URL(string: "https://archive.org/metadata/")!.appendingPathComponent(identifier)
+            return try Self.parseArchiveReleases(data: await fetch(metadata, limit: 2 * 1024 * 1024), page: url)
+        }
         guard Self.isWinWorld(url) else {
             return [RemoteRelease(title: url.deletingPathExtension().lastPathComponent.removingPercentEncoding ?? "DOS program", pageURL: url, downloadURL: url)]
         }
         let data = try await fetch(url, limit: 2 * 1024 * 1024)
         guard let html = String(data: data, encoding: .utf8) else { throw DosMacError.invalidPackage("source page is not UTF-8") }
         return try Self.parseWinWorld(html: html, page: url)
+    }
+
+    public func search(_ query: String, source: CatalogSource) async throws -> [CatalogItem] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, query.count <= 160 else { throw DosMacError.invalidPackage("enter a search of up to 160 characters") }
+        let page = source.searchURL(query)
+        let data = try await fetch(page, limit: 2 * 1024 * 1024)
+        if source == .internetArchive { return try Self.parseArchiveSearch(data: data) }
+        guard let html = String(data: data, encoding: .utf8) else { throw DosMacError.invalidPackage("the source could not be read") }
+        return Self.parseCatalogProducts(html: html, page: page)
+    }
+
+    public static func parseCatalogProducts(html: String, page: URL) -> [CatalogItem] {
+        guard let expression = try? NSRegularExpression(pattern: "(?is)<dt\\b[^>]*>(.*?)</dt>\\s*<dd\\b[^>]*>(.*?)</dd>") else { return [] }
+        var seen = Set<String>()
+        let items: [CatalogItem] = expression.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap { match in
+            guard let heading = Range(match.range(at: 1), in: html), let body = Range(match.range(at: 2), in: html),
+                  let (url, title) = anchors(String(html[heading]), relativeTo: page).first(where: { isWinWorld($0.0) && $0.0.path.hasPrefix("/product/") }), seen.insert(url.absoluteString).inserted else { return nil }
+            return CatalogItem(title: title, summary: String(plainText(String(html[body])).prefix(320)), pageURL: url, source: .winWorld)
+        }
+        if !items.isEmpty { return items }
+        return anchors(html, relativeTo: page).compactMap { url, title in
+            guard isWinWorld(url), url.path.hasPrefix("/product/"), !title.isEmpty, seen.insert(url.absoluteString).inserted else { return nil }
+            return CatalogItem(title: title, summary: "Browse available releases on WinWorld.", pageURL: url, source: .winWorld)
+        }
+    }
+
+    public static func parseArchiveSearch(data: Data) throws -> [CatalogItem] {
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let docs = (json?["response"] as? [String: Any])?["docs"] as? [[String: Any]] ?? []
+        return docs.prefix(24).compactMap { item in
+            guard let id = item["identifier"] as? String, id.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) != nil, let title = item["title"] as? String else { return nil }
+            return CatalogItem(title: title, summary: "Software archive · Review the release and supported platform before installing.", pageURL: URL(string: "https://archive.org/details/")!.appendingPathComponent(id), source: .internetArchive)
+        }
+    }
+
+    public static func parseArchiveReleases(data: Data, page: URL) throws -> [RemoteRelease] {
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let files = json?["files"] as? [[String: Any]] ?? []
+        let releases = files.compactMap { file -> RemoteRelease? in
+            guard let name = file["name"] as? String, ["zip", "7z", "exe", "com", "bat"].contains(URL(fileURLWithPath: name).pathExtension.lowercased()),
+                  file["private"] as? String != "true", file["private"] as? Bool != true, let size = file["size"] as? String, let bytes = Int(size), bytes > 0, bytes <= downloadLimit,
+                  (try? validateArchivePath(name)) != nil else { return nil }
+            let url = URL(string: "https://archive.org/download/")!.appendingPathComponent(page.lastPathComponent).appendingPathComponent(name)
+            let hash = file["sha1"] as? String
+            return RemoteRelease(title: name, pageURL: url, downloadURL: url, sha1: hash?.range(of: "^[a-fA-F0-9]{40}$", options: .regularExpression) != nil ? hash?.lowercased() : nil)
+        }
+        guard !releases.isEmpty else { throw DosMacError.invalidPackage("this item has no supported ZIP, 7z or DOS program download under 32 MiB; open its source page for other media") }
+        return releases
     }
 
     public static func parseWinWorld(html: String, page: URL) throws -> [RemoteRelease] {

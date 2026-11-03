@@ -6,15 +6,13 @@ import UniformTypeIdentifiers
 struct DosMacApp: App {
     @StateObject private var model = LibraryModel()
     @StateObject private var machines = MachineLibraryModel()
+    @StateObject private var apps = WorkspaceLibraryModel()
     #if os(macOS)
     @NSApplicationDelegateAdaptor(DosMacAppDelegate.self) private var appDelegate
     #endif
     var body: some Scene {
         WindowGroup {
-            TabView {
-                MachineLibraryView(model: machines).tabItem { Label("Machines", systemImage: "desktopcomputer") }
-                LibraryView(model: model).tabItem { Label("Legacy DOSBox", systemImage: "terminal") }
-            }
+            WorkspaceView(library: model, machines: machines, apps: apps)
                 .preferredColorScheme(.dark)
                 #if os(macOS)
                 .frame(minWidth: 960, minHeight: 680)
@@ -27,8 +25,8 @@ struct DosMacApp: App {
         #if os(macOS)
         Settings {
             TabView {
-                MachineEngineSettings().tabItem { Text("Machines") }
-                ScrollView { EngineSettings(model: model).padding(24) }.tabItem { Text("Legacy DOSBox") }
+                MachineEngineSettings().tabItem { Text("Computers") }
+                ScrollView { EngineSettings(model: model).padding(24) }.tabItem { Text("Compatibility") }
             }.frame(width: 580, height: 430)
         }
         #endif
