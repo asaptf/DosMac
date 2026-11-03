@@ -46,6 +46,11 @@ public actor LibraryStore {
         guard (try? entry.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
             throw DosMacError.invalidPackage("entry point is missing; path case must match payload")
         }
+        for disk in manifest.floppyDisks ?? [] {
+            guard (try? payload.appendingPathComponent(disk.imagePath).resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                throw DosMacError.invalidPackage("declared floppy image is missing")
+            }
+        }
         let staging = root.appendingPathComponent("Programs/.install-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: staging) }
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -68,6 +73,32 @@ public actor LibraryStore {
         var updated = program
         updated.lastLaunchedAt = Date()
         try JSONEncoder().encode(updated).write(to: programURL(program.id).appendingPathComponent("installed.json"), options: .atomic)
+    }
+
+    public func floppyDisks(for program: InstalledProgram) throws -> [FloppyDisk] {
+        try program.manifest.validate()
+        let drive = programURL(program.id).appendingPathComponent("DriveC")
+        let media = drive.appendingPathComponent("MEDIA")
+        guard fm.fileExists(atPath: media.path) else { return [] }
+        try rejectLink(media)
+        let disks: [FloppyDisk]
+        if let declared = program.manifest.floppyDisks { disks = declared }
+        else {
+            // Existing imports need no reinstallation to gain disk controls.
+            let files = try fm.contentsOfDirectory(at: media, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent.range(of: "^DISK[0-9]{2}\\.IMG$", options: .regularExpression) != nil }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            disks = try files.enumerated().map { index, file in
+                guard file.lastPathComponent == String(format: "DISK%02d.IMG", index + 1), index < 32 else { throw DosMacError.invalidPackage("floppy images are not in a contiguous disk order") }
+                return FloppyDisk(number: index + 1, imagePath: "MEDIA/\(file.lastPathComponent)", label: "Disk \(index + 1)")
+            }
+        }
+        for disk in disks {
+            let image = drive.appendingPathComponent(disk.imagePath)
+            try rejectLink(image)
+            guard try image.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { throw DosMacError.invalidPackage("floppy image is missing") }
+        }
+        return disks
     }
 
     public func entryPoints(for program: InstalledProgram) throws -> [String] {

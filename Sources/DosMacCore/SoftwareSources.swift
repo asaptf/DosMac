@@ -24,6 +24,7 @@ public struct PreparedImport: Sendable {
     public let candidates: [String]
     public let isInstallationMedia: Bool
     public let source: URL
+    public let floppyDisks: [FloppyDisk]
 }
 
 /// Fetches source metadata and prepares a private, validated local package.
@@ -155,6 +156,7 @@ public actor SoftwareSources {
             return relative
         }.sorted()
         var media = false
+        var floppyDisks: [FloppyDisk] = []
         var choices = candidates
         if choices.isEmpty {
             let images = files.filter { ["img", "ima", "dsk"].contains($0.pathExtension.lowercased()) }.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
@@ -170,12 +172,13 @@ public actor SoftwareSources {
                 let name = String(format: "DISK%02d.IMG", index + 1)
                 try fm.copyItem(at: image, to: mediaFolder.appendingPathComponent(name))
                 mounts.append("\"C:\\MEDIA\\\(name)\"")
+                floppyDisks.append(FloppyDisk(number: index + 1, imagePath: "MEDIA/\(name)", label: image.lastPathComponent))
             }
             let script = """
             @echo off
             imgmount a \(mounts.joined(separator: " ")) -t floppy
             a:
-            echo Installation media mounted. Use DOSBox-X swap-disk controls when requested.
+            echo Installation media mounted. Use Next disk in DosMac when requested.
             if exist SETUP.EXE goto setup
             if exist INSTALL.EXE goto install
             echo No automatic entry point found. Run the appropriate installer below.
@@ -195,13 +198,14 @@ public actor SoftwareSources {
             media = true
         }
         succeeded = true
-        return PreparedImport(workspace: workspace, package: package, title: resolved.title, candidates: choices, isInstallationMedia: media, source: resolved.pageURL)
+        return PreparedImport(workspace: workspace, package: package, title: resolved.title, candidates: choices, isInstallationMedia: media, source: resolved.pageURL, floppyDisks: floppyDisks)
     }
 
     public func finalize(_ prepared: PreparedImport, executable: String, profile: MachineProfile) throws -> URL {
         guard prepared.candidates.contains(executable) else { throw DosMacError.invalidPackage("entry point was not found in this download") }
         let digest = SHA256.hash(data: Data(prepared.source.absoluteString.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        let manifest = PackageManifest(id: "web.\(digest)", title: prepared.title + (prepared.isInstallationMedia ? " · Setup" : ""), summary: prepared.isInstallationMedia ? "Installation media from \(prepared.source.host ?? "web"). Launch to run the guest installer. Disk swapping may be required." : "Imported from \(prepared.source.host ?? "web").", author: prepared.source.host ?? "User source", license: "User-supplied source; see original publisher terms", executable: executable, profile: profile)
+        var manifest = PackageManifest(id: "web.\(digest)", title: prepared.title + (prepared.isInstallationMedia ? " · Setup" : ""), summary: prepared.isInstallationMedia ? "Installation media from \(prepared.source.host ?? "web"). Launch to run the guest installer. Change disks in the DosMac drive panel." : "Imported from \(prepared.source.host ?? "web").", author: prepared.source.host ?? "User source", license: "User-supplied source; see original publisher terms", executable: executable, profile: profile)
+        manifest.floppyDisks = prepared.floppyDisks.isEmpty ? nil : prepared.floppyDisks
         try manifest.validate()
         try JSONEncoder().encode(manifest).write(to: prepared.package.appendingPathComponent("manifest.json"), options: .atomic)
         // Preserve source provenance without overwriting any program payload file.

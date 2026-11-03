@@ -8,7 +8,7 @@ The first provider supports WinWorld product pages and individual download pages
 2. Click **Find downloads** and choose the exact release/language.
 3. Choose the hardware profile and optionally enable **Launch after installation**.
 4. Click **Install**. An archive with one DOS entry point installs automatically. Multiple entry points prompt for a selection.
-5. For floppy archives, launch the prepared **Setup** item, complete the guest installer, then stop the session and use the gear beside **Launch** to choose the installed program's entry point.
+5. For floppy archives, launch the prepared **Setup** item. Use DosMac's **Floppy drive · A:** panel to insert disks when requested. Complete the guest installer, then stop the session and use the gear beside **Launch** to choose the installed program's entry point.
 
 This is one-action installation after a release is selected for ready-to-run packages. It is not a universal unattended installer. Future curated recipes can preselect entry points, disk ordering and validated unattended setup steps for specific releases.
 
@@ -28,6 +28,6 @@ Downloads are limited to 32 MiB and declared expanded data to 128 MiB/20,000 ent
 
 EXE files identified as Windows NE/PE are not offered as standalone DOS startup programs. A working Windows installation is required to run Windows applications. Windows 3.1 installation from disks remains an interactive, unverified compatibility workflow; Windows 9x bootable HDD/CD images are not supported yet.
 
-Recognized raw floppy extensions are `.img`, `.ima` and `.dsk`, limited to standard floppy sizes and at most 32 disks. Files are renamed to safe `MEDIA/DISKnn.IMG` paths and passed to DOSBox-X `imgmount`. The initial disk order follows natural filename order; release-specific recipes are needed where labels differ. Setup runs from `A:` and writes to the program's private `C:`. Use DOSBox-X's disk-swap controls when prompted. A prepared installer is distinct from an installed application.
+Recognized raw floppy extensions are `.img`, `.ima` and `.dsk`, limited to standard floppy sizes and at most 32 disks. Files are renamed to safe `MEDIA/DISKnn.IMG` paths and passed to DOSBox-X `imgmount`. Original source filenames are retained as disk labels. The initial disk order follows natural filename order; release-specific recipes are needed where labels differ. Setup runs from `A:` and writes to the program's private `C:`. Use DosMac's [disk controls](disk-controls.md) when prompted. A prepared installer is distinct from an installed application.
 
 Each installed import records its original source URL as `source-url.txt` beside `installed.json`, not inside the writable DOS drive. Source availability does not establish a redistribution license; no third-party software is bundled or republished by DosMac.

@@ -7,6 +7,7 @@ public enum DosMacError: LocalizedError {
     case engineInstallation(String)
     case unsupportedPlatform
     case sessionActive
+    case diskControl(String)
 
     public var errorDescription: String? {
         switch self {
@@ -16,6 +17,7 @@ public enum DosMacError: LocalizedError {
         case .engineInstallation(let reason): reason
         case .unsupportedPlatform: "The embedded emulator is not available in this iPhone preview yet. Library and file import are available."
         case .sessionActive: "Stop the current session before launching another program."
+        case .diskControl(let reason): reason
         }
     }
 }
@@ -37,6 +39,7 @@ public struct PackageManifest: Codable, Equatable, Sendable {
     public var license: String
     public var executable: String
     public var profile: MachineProfile
+    public var floppyDisks: [FloppyDisk]?
 
     public init(id: String, title: String, summary: String, version: String = "1.0", author: String, license: String, executable: String, profile: MachineProfile = .dos) {
         self.formatVersion = 1
@@ -62,6 +65,14 @@ public struct PackageManifest: Codable, Equatable, Sendable {
         let path = executable.replacingOccurrences(of: "\\", with: "/")
         guard path.range(of: "^([A-Za-z0-9_~-]{1,8}/)*[A-Za-z0-9_~-]{1,8}\\.(EXE|COM|BAT)$", options: [.regularExpression, .caseInsensitive]) != nil else {
             throw DosMacError.invalidPackage("entry point must be a relative DOS 8.3 EXE, COM, or BAT path")
+        }
+        if let disks = floppyDisks {
+            guard disks.count <= 32, Set(disks.map { $0.imagePath.lowercased() }).count == disks.count else { throw DosMacError.invalidPackage("invalid floppy disk set") }
+            for (index, disk) in disks.enumerated() {
+                guard disk.number == index + 1, disk.imagePath == String(format: "MEDIA/DISK%02d.IMG", disk.number), !disk.label.isEmpty else {
+                    throw DosMacError.invalidPackage("floppy disks must use ordered MEDIA/DISKnn.IMG paths")
+                }
+            }
         }
     }
 }

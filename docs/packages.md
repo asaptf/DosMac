@@ -27,6 +27,8 @@ Identifiers contain lowercase alphanumerics separated by dots or hyphens, up to 
 
 Profiles are `dos` and `windows31`. A profile chooses emulator hardware settings; it is not proof that a program or Windows installation works.
 
+An optional `floppyDisks` array records the disk order and source labels. Each entry has `number` (starting at 1), `imagePath` (exactly `MEDIA/DISKnn.IMG` for that number), and `label`. Up to 32 entries are allowed. Paths must be unique and all declared images must exist in the payload. Existing manifests without this array remain compatible; DosMac discovers a contiguous `MEDIA/DISK01.IMG`, `DISK02.IMG`, … set for the drive panel.
+
 The manifest limit is 64 KiB. The payload limit is 512 MiB and 20,000 entries. Symbolic links, special files and case-colliding paths are rejected. Duplicate IDs are rejected. Unsuccessful installs never appear in the library. Imports copy data; DOS may subsequently modify its private copy.
 
 The format does not yet support archives, remote URLs, install scripts, launch arguments, dependencies, updates, or disk-image boot. Only add these through a new validated schema, preserving version-1 behavior.

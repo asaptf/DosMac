@@ -33,6 +33,8 @@ Use **Import package** to select a `.dosmac` directory. The example at `Examples
 
 Use **Add from web** to paste a WinWorld product/download page or a direct HTTPS ZIP/7z/DOS-file URL. Select a release and click **Install**. Single-entry archives install directly; multiple entry points prompt for selection. Enable **Launch after installation** to start the program immediately. Floppy archives prepare a guest installer rather than pretending the program is already installed. See [software sources](docs/software-sources.md).
 
+When Setup requests another disk, use the **Floppy drive · A:** panel above the library. Click **Next disk**, or choose a disk and click **Insert selected disk**. Return to the installer and press Enter after the panel confirms the inserted disk. On macOS, disk buttons require Accessibility permission for DosMac; click **Enable disk controls…** to open the system prompt. Without permission, use **F12 + O** in DOSBox-X (possibly **Fn + F12 + O** on a Mac keyboard). See [disk controls](docs/disk-controls.md).
+
 ## Build for iPhone
 
 ```sh
@@ -55,6 +57,7 @@ Open `DosMac.xcodeproj`, choose `DosMac-iOS`, select a simulator or configure yo
 - WinWorld page and mirror resolution, optional published SHA-512 validation, and direct HTTPS file imports.
 - ZIP and supported 7z archive extraction with path/type/count/declared-size validation.
 - Floppy-media preparation and editable startup programs after guest installation.
+- Live floppy drive panel with disk selection, next-disk control, and mount confirmation from DOSBox-X. Previously imported disk sets are detected automatically.
 - macOS DOSBox-X process lifecycle, stop control, generated configuration, and session logs.
 - Automatic, checksum-verified engine preparation, cancellation/retry, offline reuse, and bundled-engine discovery.
 - DOS/386 and Windows 3.1/486 configuration profiles using `core=normal` (interpreter).

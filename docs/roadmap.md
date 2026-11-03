@@ -9,6 +9,7 @@
 - [x] Native iOS library and Exchange import/export build.
 - [x] WinWorld metadata/mirror import and direct HTTPS ZIP/7z/DOS-file import.
 - [x] Floppy-media setup launcher and startup-program selection.
+- [x] Live disk panel with next/selected disk controls, legacy-media discovery, and emulator log acknowledgement.
 - [x] Automated storage/configuration tests and an opt-in real-engine smoke test.
 - [ ] Manual library, import and launch checks on both platform UIs.
 

@@ -33,6 +33,8 @@ final class LibraryModel: ObservableObject {
     @Published var isInstalling = false
     @Published var engineProgress: EngineInstallProgress?
     @Published var isLaunching = false
+    @Published var floppyDrive = FloppyDriveStatus()
+    @Published var diskControlsEnabled = false
     @Published var enginePath: String = UserDefaults.standard.string(forKey: "enginePath") ?? "" {
         didSet { UserDefaults.standard.set(enginePath, forKey: "enginePath") }
     }
@@ -48,12 +50,18 @@ final class LibraryModel: ObservableObject {
         programs.filter { query.isEmpty || $0.manifest.title.localizedCaseInsensitiveContains(query) }
     }
     var current: InstalledProgram? { programs.first { $0.id == selected } }
+    var sessionProgram: InstalledProgram? {
+        if case .running(let id) = status { return programs.first { $0.id == id } }
+        return nil
+    }
     var running: Bool { if case .running = status { true } else { false } }
 
     init() {
         do { library = try LibraryStore(root: LibraryStore.defaultRoot) }
         catch { self.error = error.localizedDescription }
         session.onStateChange = { [weak self] in self?.status = $0 }
+        session.onFloppyChange = { [weak self] in self?.floppyDrive = $0 }
+        refreshDiskControlAccess()
         Task { await refresh() }
     }
 
@@ -112,7 +120,7 @@ final class LibraryModel: ObservableObject {
         let id = UUID()
         enginePreparationID = id
         let installer = engineInstaller
-        let preparation = Task {
+        let preparation = Task { [weak self] in
             try await installer.ensureInstalled { [weak self] progress in
                 await self?.updateEngineProgress(progress, id: id)
             }
@@ -136,6 +144,14 @@ final class LibraryModel: ObservableObject {
         #if os(macOS)
         enginePreparation?.cancel()
         #endif
+    }
+
+    func refreshDiskControlAccess() { diskControlsEnabled = session.canControlDisks }
+
+    func selectFloppy(_ number: Int) async {
+        do { try await session.selectFloppy(number: number) }
+        catch { /* The drive panel displays the contextual error without interrupting setup. */ }
+        refreshDiskControlAccess()
     }
 
     #if os(macOS)
@@ -187,6 +203,7 @@ struct LibraryView: View {
     @State private var showSettings = false
     @State private var showSources = false
     @State private var showStartup = false
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 30) {
@@ -226,6 +243,9 @@ struct LibraryView: View {
                         Text("A thoughtful home for your DOS programs.").foregroundStyle(.secondary)
                     }
                     hero
+                    if model.running, !model.floppyDrive.disks.isEmpty {
+                        FloppyDrivePanel(model: model)
+                    }
                     HStack {
                         Text("Your library").font(.title2.weight(.semibold))
                         Text(String(model.programs.count)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
@@ -257,7 +277,7 @@ struct LibraryView: View {
                             }
                         }
                     }
-                    if let current = model.current {
+                    if let current = model.sessionProgram ?? model.current {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) { Text(current.manifest.title).font(.headline); Text(current.manifest.profile.title + " · D: Exchange enabled").font(.caption).foregroundStyle(.secondary) }
                             Spacer()
@@ -274,6 +294,9 @@ struct LibraryView: View {
             }.background(base).navigationTitle("Library")
         }
         .tint(mint)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.refreshDiskControlAccess() }
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.folder]) { result in
             switch result { case .success(let url): Task { await model.install(url) }; case .failure(let error): model.error = error.localizedDescription }
         }
