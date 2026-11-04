@@ -118,10 +118,16 @@ public enum Windows9xRecipe {
       SETUP.EXE C:\\MSBATCH.INF /IS /IM /IE
       ECHO DM9X-SETUP-RETURNED
       """)
+    // Windows 98 numeric UNC access fails with our TCP-only private transport.
+    // A local NetBIOS name works and must differ from the guest name DOSMAC.
+    let shareSetup = sharing ? """
+      ECHO 10.0.2.4 DOSHOST #PRE >>C:\\WINDOWS\\LMHOSTS
+      COPY /Y C:\\DMSHARE.BAT "C:\\WINDOWS\\Start Menu\\Programs\\StartUp\\DosMac.bat" >NUL
+      """ : "REM Live sharing is disabled"
     let ready = crlf(
       """
       @ECHO OFF
-      \(sharing ? "COPY /Y C:\\DMSHARE.BAT \"C:\\WINDOWS\\Start Menu\\Programs\\StartUp\\DosMac.bat\" >NUL" : "REM Live sharing is disabled")
+      \(shareSetup)
       C:\\DMDONE.COM
       EXIT
       """)
@@ -149,7 +155,7 @@ public enum Windows9xRecipe {
       "DMREADY.BAT": Data(ready.utf8), "YES.TXT": Data("Y\r\nY\r\n".utf8),
       // RunOnce can execute inside Setup before networking is ready. Map at user logon.
       "DMSHARE.BAT": Data(
-        crlf("@ECHO OFF\nNET USE H: \\\\10.0.2.4\\DOSMAC /YES <NUL >NUL\nEXIT").utf8),
+        crlf("@ECHO OFF\nNBTSTAT -R >NUL\nNET USE H: \\\\DOSHOST\\DOSMAC /YES <NUL >NUL\nEXIT").utf8),
       // Original 8086 code: DOS disk reset/flush (INT 21h/AH=0Dh), then exit.
       "DMFLUSH.COM": Data([0xb4, 0x0d, 0xcd, 0x21, 0xb8, 0x00, 0x4c, 0xcd, 0x21]),
       // Flush pending input, print the acknowledgement, then wait for the host's key.

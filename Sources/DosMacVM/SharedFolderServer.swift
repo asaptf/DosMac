@@ -47,7 +47,7 @@
         [global]
         server role = standalone server
         workgroup = WORKGROUP
-        netbios name = DOSMAC
+        netbios name = DOSHOST
         interfaces = 127.0.0.1
         bind interfaces only = yes
         server smb transports = nbt:\(port)

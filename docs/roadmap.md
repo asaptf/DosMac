@@ -33,7 +33,8 @@ Exit: one prepared recipe installs all three products, boots from HDD, launches 
 - [ ] PC DOS compatibility and installation recipes.
 - [x] Pinned Windows 95/98 CD and boot-floppy media, new-PC provisioning and batch answer files.
 - [x] Exclusive host/guest FAT16 shared disk and app-private SMB1 folder service.
-- [ ] Complete Windows 95/98 desktop and driver acceptance, including live-folder mapping.
+- [x] Windows 98 SE desktop, HDD cold boot, PCI/network drivers and live-folder transfer in both directions.
+- [ ] Windows 95 desktop and driver acceptance, including live-folder mapping.
 - [ ] Application recipes for additional Word/Office versions, tied to exact source media.
 - [ ] Signed/notarized self-contained engine distributions, complete license/source packages, Intel validation.
 - [ ] Embedded no-JIT iPhone runtime and physical-device performance/lifecycle testing.

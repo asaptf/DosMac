@@ -29,6 +29,10 @@ struct InstallerTests {
     @Test func guestTypingValidatesWholeCommandBeforeSending() throws {
         let strokes = try GuestTyping.strokes(for: "C:\\SETUP /H:C:\\SETUP.SHH\n")
         #expect(strokes.last?.qcode == "ret")
+        // Paths and batch/LMHOSTS comments must accept every printable US ASCII character.
+        let printable = String((32...126).compactMap(UnicodeScalar.init).map(Character.init))
+        #expect(try GuestTyping.strokes(for: printable).count == 95)
+        #expect(try GuestTyping.strokes(for: "#").first == GuestKeystroke(qcode: "3", shift: true))
         #expect(strokes.contains { $0.qcode == "semicolon" && $0.shift })
         #expect(throws: (any Error).self) { try GuestTyping.strokes(for: "unsupported 🐈") }
     }
