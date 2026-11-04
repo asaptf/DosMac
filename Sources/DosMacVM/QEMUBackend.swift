@@ -70,6 +70,12 @@ public enum QEMUArguments {
         if machine.guest.needsCD, machine.installation?.recipeID == Windows9xRecipe.id(for: machine.guest) {
             // DOS's BPB geometry must match SeaBIOS even before Setup installs protected-mode IDE.
             args[args.count - 1] += ",lcyls=520,lheads=64,lsecs=63,bios-chs-trans=lba"
+            let bios = ProcessInfo.processInfo.environment["DOSMAC_WIN9X_BIOS"].map { URL(fileURLWithPath: $0) }
+                ?? installation.firmware.appendingPathComponent("bios-win9x.bin")
+            guard FileManager.default.fileExists(atPath: bios.path) else {
+                throw VMError.invalid("This Windows computer needs the embedded Windows 9x firmware. Rebuild DosMac with scripts/build-win9x-bios.py and scripts/bundle-qemu.py.")
+            }
+            args += ["-bios", bios.path]
         }
         if machine.sharedDisk == true {
             args += ["-blockdev", try json(.object(["driver": .string("raw"), "node-name": .string("shared-disk"), "file": .object(["driver": .string("file"), "filename": .string(SharedStorage.image(in: directory).path)])])), "-device", "ide-hd,drive=shared-disk,bus=ide.0,unit=1,lcyls=131,lheads=16,lsecs=63,bios-chs-trans=none"]

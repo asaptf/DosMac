@@ -25,7 +25,10 @@ struct MachineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try MachineStore(root: root.appendingPathComponent("Machines"))
         // Option-like user names must never be mistaken for argument-vector switches.
-        var machine = try await store.create(name: "-net", guest: .msdos622)
+        let windowsFirmware = ProcessInfo.processInfo.environment["DOSMAC_TEST_WIN9X_FIRMWARE"] == "1"
+        var machine = try await store.create(name: "-net", guest: windowsFirmware ? .windows98 : .msdos622)
+        machine.boot = .floppy
+        if windowsFirmware { machine.installation = InstallationRecord(recipeID: Windows9xRecipe.id(for: .windows98), stage: .windowsSetup) }
         machine.sharedDisk = true
         machine.sharedFolder = ProcessInfo.processInfo.environment["DOSMAC_TEST_SAMBA"] == "1"
         let first = root.appendingPathComponent("DISK1.img"), second = root.appendingPathComponent("DISK2.img"), cd = root.appendingPathComponent("SETUP.iso")

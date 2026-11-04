@@ -36,7 +36,8 @@ public final class MachineSession {
             if machine.sharedDisk == true { try await SharedStorage.prepareForGuest(in: directory) }
         } catch { state = .failed(error.localizedDescription); throw error }
         let runtime = URL(fileURLWithPath: "/tmp/dosmac-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        do { try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) }
+        catch { state = .failed(error.localizedDescription); throw error }
         self.runtime = runtime; self.machine = machine; self.directory = directory
         if machine.sharedFolder == true {
             let server = SharedFolderServer()
@@ -45,11 +46,13 @@ public final class MachineSession {
         }
         let input = Pipe(), output = Pipe()
         let task = Process(); task.executableURL = engine.executable
-        task.arguments = try QEMUArguments.make(machine: machine, directory: directory, runtime: runtime, installation: engine, muted: muted, sharingPort: sharing?.port)
+        do { task.arguments = try QEMUArguments.make(machine: machine, directory: directory, runtime: runtime, installation: engine, muted: muted, sharingPort: sharing?.port) }
+        catch { await cleanup(); state = .failed(error.localizedDescription); throw error }
         task.currentDirectoryURL = directory
         let logURL = directory.appendingPathComponent("qemu.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        log = try FileHandle(forWritingTo: logURL)
+        do { log = try FileHandle(forWritingTo: logURL) }
+        catch { await cleanup(); state = .failed(error.localizedDescription); throw error }
         task.standardInput = input; task.standardOutput = output; task.standardError = log
         task.terminationHandler = { [weak self] task in
             let code = task.terminationStatus
@@ -241,7 +244,11 @@ public final class MachineSession {
     }
 
     private func receive(_ frame: VMFrame) { latestFrame = frame; textDisplay = frame.width == 720 && frame.height == 400; onFrame?(frame) }
-    private func displayFailed(_ message: String) { onDisplayError?(message) }
+    private func displayFailed(_ message: String) {
+        // Guest-initiated ACPI shutdown closes the display socket normally.
+        guard isActive else { return }
+        onDisplayError?(message)
+    }
     private func cleanup() async {
         sharing?.stop(); sharing = nil
         if let display { await display.stop() }; self.display = nil

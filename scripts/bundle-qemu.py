@@ -23,11 +23,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", required=True, type=Path)
     parser.add_argument("--qemu", default=shutil.which("qemu-system-i386"), type=Path)
+    parser.add_argument("--win9x-firmware", default=Path("build/firmware"), type=Path)
     samba = next((p for p in [shutil.which("samba-dot-org-smbd"),
                               "/opt/homebrew/sbin/samba-dot-org-smbd", "/usr/local/sbin/samba-dot-org-smbd"]
                   if p and Path(p).is_file()), None)
     parser.add_argument("--samba", default=samba, type=Path)
     args = parser.parse_args()
+    if not (args.win9x_firmware / "bios-win9x.bin").is_file():
+        parser.error("Build Windows 9x firmware first: python3 scripts/build-win9x-bios.py")
     if not args.qemu or not args.qemu.exists():
         parser.error("A developer QEMU installation is required to build the bundled app.")
     app = args.app.resolve()
@@ -86,6 +89,9 @@ def main():
     firmware = ["bios-256k.bin", "bios.bin", "vgabios-cirrus.bin", "vgabios-stdvga.bin", "kvmvapic.bin", "efi-pcnet.rom"]
     for name in firmware:
         shutil.copy2(prefix / "share/qemu" / name, destination / "share/qemu" / name)
+    for name in ["bios-win9x.bin", "SEABIOS-COPYING.txt", "seabios.config", "seabios-source.tar.gz", "seabios-build.json"]:
+        target = destination / "share/qemu" / name if name == "bios-win9x.bin" else destination / name
+        shutil.copy2(args.win9x_firmware / name, target)
     shutil.copytree(prefix / "share/qemu/keymaps", destination / "share/qemu/keymaps")
     for target in sorted(copied.values(), key=lambda p: p.parent.name != "lib"):
         for dependency in dependencies(target):

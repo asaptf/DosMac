@@ -22,6 +22,8 @@ Plain DOS packages use the established compatibility importer. Both paths select
 
 The native player keeps controls above the screen and puts floppies/CD-ROM in a compact popover. Installer shortcuts scope the next-disk action to their own bank, with an option to show all computer media. Leaving the player releases captured input but keeps the VM running. Power-off remains explicit to protect guest data.
 
+The session’s More menu offers **Type text in guest…**. Focus a destination in the guest first, then paste text into the native panel and review it before sending. It simulates the US keyboard, including Enter for line breaks, and validates the entire text before typing. Stop cancels remaining keystrokes; characters already entered remain in the guest.
+
 Files separates a native computer's transfer floppies from imported packages' shared D: folder. Native transfer preparation/export remains limited to a stopped computer. Imported-package files retain ordinary file import and share/export controls, including in the iPhone library preview.
 
 Native computers can additionally use a 64 MiB shared hard disk, opened in Finder only while stopped and automatically detached before guest boot. Windows 9x can use a live, app-private network folder. Discover and Computers expose the Windows 95/98 experimental setup sheet. See [host sharing and Windows 9x](host-sharing-and-windows9x.md) for the ownership rules, driver requirements, source media and validation status.

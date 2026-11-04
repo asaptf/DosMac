@@ -90,6 +90,8 @@ public enum Windows9xRecipe {
       IF ERRORLEVEL 1 GOTO FAILED
       COPY /Y A:\\DMREADY.BAT C:\\DMREADY.BAT >NUL
       IF ERRORLEVEL 1 GOTO FAILED
+      COPY /Y A:\\DMSHARE.BAT C:\\DMSHARE.BAT >NUL
+      IF ERRORLEVEL 1 GOTO FAILED
       COPY /Y A:\\DMINST.BAT C:\\DMINST.BAT >NUL
       IF ERRORLEVEL 1 GOTO FAILED
       COPY /Y A:\\DMFLUSH.COM C:\\DMFLUSH.COM >NUL
@@ -119,7 +121,7 @@ public enum Windows9xRecipe {
     let ready = crlf(
       """
       @ECHO OFF
-      \(sharing ? "NET USE H: \\\\10.0.2.4\\DOSMAC /YES <NUL >NUL" : "REM Live sharing is disabled")
+      \(sharing ? "COPY /Y C:\\DMSHARE.BAT \"C:\\WINDOWS\\Start Menu\\Programs\\StartUp\\DosMac.bat\" >NUL" : "REM Live sharing is disabled")
       C:\\DMDONE.COM
       EXIT
       """)
@@ -145,6 +147,9 @@ public enum Windows9xRecipe {
         ).utf8),
       "AUTOEXEC.BAT": Data(autoexec.utf8), "DMINST.BAT": Data(install.utf8),
       "DMREADY.BAT": Data(ready.utf8), "YES.TXT": Data("Y\r\nY\r\n".utf8),
+      // RunOnce can execute inside Setup before networking is ready. Map at user logon.
+      "DMSHARE.BAT": Data(
+        crlf("@ECHO OFF\nNET USE H: \\\\10.0.2.4\\DOSMAC /YES <NUL >NUL\nEXIT").utf8),
       // Original 8086 code: DOS disk reset/flush (INT 21h/AH=0Dh), then exit.
       "DMFLUSH.COM": Data([0xb4, 0x0d, 0xcd, 0x21, 0xb8, 0x00, 0x4c, 0xcd, 0x21]),
       // Flush pending input, print the acknowledgement, then wait for the host's key.
@@ -175,6 +180,7 @@ public enum Windows9xRecipe {
       var lastChange = Date()
       var confirmedUserInfo = false
       var confirmedDateTime = false
+      var releasedFirstStart = false
       while session.isActive, Date() < deadline {
         try Task.checkCancellation()
         if session.frameSnapshot() == nil {
@@ -197,8 +203,26 @@ public enum Windows9xRecipe {
           await report("Windows Setup returned to DOS. Review its message before continuing.", true)
           return false
         }
-        if marker.contains("dm9xdesktopready") {
+        if marker.contains("enterwindowspassword") || marker.contains("confirmpassword") {
+          await report(
+            "Complete Windows logon in the guest, then choose Continue installation. DosMac does not choose or enter your password.",
+            true)
+          return false
+        }
+        if !releasedFirstStart,
+          marker.contains("dm9xdesktopready") || marker.contains("msdospromptdmdone")
+        {
           try await session.tap("ret")
+          releasedFirstStart = true
+          await report("Finishing Windows settings and waiting for the desktop…", false)
+          continue
+        }
+        // Setup also runs RunOnce entries before its final restart. A completed batch
+        // alone is insufficient: wait until Explorer actually displays the desktop.
+        if marker.contains("start"),
+          marker.contains("mycomputer") || marker.contains("recyclebin"),
+          !marker.contains("windows98setup"), !marker.contains("windows95setup")
+        {
           await report(
             "Windows installation completed. Your desktop and shared files are ready.", false)
           return true

@@ -59,6 +59,8 @@ Windows9xRecipe now provisions pinned English CD media, patches an OEM startup f
 
 The development application supports an explicit `DOSMAC_QEMU_PATH`, a bundled QEMU tree, and existing local installations. `scripts/bundle-qemu.py` assembles a local macOS developer app with QEMU, its non-system dylib closure, BIOS/VGA firmware and VNC keymaps, rewrites library paths, and ad-hoc signs the result. It does not download or bundle DOS/Windows/Word images.
 
+Run `scripts/build-win9x-bios.py` before bundling. It builds pinned SeaBIOS with PnP BIOS disabled so Windows 9x detects the PCI bus. The bundle retains this firmware’s exact source archive, configuration and license. Only managed Windows 9x recipes select it; a missing compatibility BIOS fails startup with a clear error and cleans up the private sharing process.
+
 This script is not a production release pipeline. Distribution still needs complete dependency notices and corresponding source where required, versioned engine manifests, signed/notarized architecture-specific artifacts, and CI verification on Intel and Apple Silicon. The current local bundled engine has been exercised on Apple Silicon. No iPhone QEMU runtime is shipped; that requires an embedded interpreter build and platform-specific lifecycle work. UTM SE is evidence that a no-JIT route exists, not a drop-in runtime dependency.
 
 ## Future MCP boundary

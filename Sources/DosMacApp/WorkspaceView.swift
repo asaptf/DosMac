@@ -25,7 +25,7 @@ struct WorkspaceView: View {
     case computer(Bool)
     case shortcut(GuestApplication?)
     case windows9x(GuestSystem)
-    case classicSettings, startup
+    case classicSettings, startup, guestText
     var id: String {
       switch self {
       case .source(let url): "source-" + url
@@ -34,6 +34,7 @@ struct WorkspaceView: View {
       case .windows9x(let guest): "install-" + guest.rawValue
       case .classicSettings: "settings"
       case .startup: "startup"
+      case .guestText: "guest-text"
       }
     }
   }
@@ -124,6 +125,10 @@ struct WorkspaceView: View {
       case .classicSettings: ScrollView { EngineSettings(model: library).padding(28) }
       case .startup:
         if let program = library.current { StartupSettings(model: library, program: program) }
+      case .guestText:
+        #if os(macOS)
+          GuestTextSheet(model: machines)
+        #endif
       }
     }
     .fileImporter(isPresented: $importing, allowedContentTypes: [.folder]) { result in
@@ -618,6 +623,7 @@ struct WorkspaceView: View {
               }.disabled(machines.busy)
               SessionMediaMenu(model: machines, preferredMedia: playingMedia)
               Menu {
+                Button("Type text in guest…") { sheet = .guestText }
                 Button("Ctrl + Alt + Del") {
                   Task { try? await machines.session.sendChord(["ctrl", "alt", "delete"]) }
                 }

@@ -5,6 +5,46 @@ import DosMacVM
 import AppKit
 import CoreGraphics
 
+struct GuestTextSheet: View {
+    @ObservedObject var model: MachineLibraryModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var sending = false
+    @State private var error: String?
+    @State private var task: Task<Void, Never>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Type text in guest").font(.title2.bold())
+            Text("Focus the destination inside DOS or Windows before opening this panel. Paste a path or text here; DosMac types it using the guest’s US keyboard layout. Each line break presses Enter.")
+                .font(.callout).foregroundStyle(.secondary)
+            TextEditor(text: $text).font(.system(.body, design: .monospaced))
+                .frame(height: 150).disabled(sending)
+            if let error { Text(error).foregroundStyle(.orange) }
+            HStack {
+                if sending { ProgressView().controlSize(.small); Text("Typing…") }
+                Spacer()
+                Button(sending ? "Stop" : "Cancel") { task?.cancel(); dismiss() }
+                Button("Type text") {
+                    do {
+                        _ = try GuestTyping.strokes(for: text)
+                        sending = true; error = nil
+                        task = Task {
+                            do { try await model.session.typeText(text); dismiss() }
+                            catch is CancellationError { }
+                            catch { self.error = error.localizedDescription }
+                            sending = false
+                        }
+                    } catch { self.error = error.localizedDescription }
+                }.buttonStyle(.borderedProminent)
+                    .disabled(sending || text.isEmpty || !model.active || model.busy)
+            }
+        }.padding(24).frame(width: 580)
+            .interactiveDismissDisabled(sending)
+            .onDisappear { task?.cancel() }
+    }
+}
+
 struct MachineDisplayView: NSViewRepresentable {
     let image: CGImage?
     let session: MachineSession
