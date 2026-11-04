@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install developer tools
-        run: brew install xcodegen qemu
+        run: brew install xcodegen qemu samba
       - name: Test core and build SwiftUI executable
         run: DOSMAC_TEST_QEMU=1 swift test
       - name: Generate application projects
@@ -16,6 +16,7 @@ jobs:
       - name: Bundle and verify the self-contained PC engine
         run: |
           python3 scripts/bundle-qemu.py --app build/macOS/Build/Products/Debug/DosMac.app
-          DOSMAC_QEMU_PATH="$PWD/build/macOS/Build/Products/Debug/DosMac.app/Contents/Resources/QEMU/bin/qemu-system-i386" DOSMAC_TEST_QEMU=1 swift test --filter realPCBootDisplayAndDirectMediaControl
+          DOSMAC_QEMU_PATH="$PWD/build/macOS/Build/Products/Debug/DosMac.app/Contents/Resources/QEMU/bin/qemu-system-i386" DOSMAC_SMBD_PATH="$PWD/build/macOS/Build/Products/Debug/DosMac.app/Contents/Resources/QEMU/bin/smbd" DOSMAC_TEST_QEMU=1 DOSMAC_TEST_SAMBA=1 swift test --filter realPCBootDisplayAndDirectMediaControl
+          DOSMAC_SMBD_PATH="$PWD/build/macOS/Build/Products/Debug/DosMac.app/Contents/Resources/QEMU/bin/smbd" DOSMAC_SMBCLIENT_PATH="$(brew --prefix)/bin/smbclient" DOSMAC_TEST_SAMBA=1 swift test --filter privateSMB1FolderSupportsBothDirectionsAndRejectsSymlinks
       - name: Build iPhone simulator app
         run: xcodebuild -project DosMac.xcodeproj -scheme DosMac-iOS -sdk iphonesimulator -configuration Debug -derivedDataPath build/iOS CODE_SIGNING_ALLOWED=NO build

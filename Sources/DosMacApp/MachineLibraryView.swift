@@ -32,7 +32,10 @@ final class MachineLibraryModel: ObservableObject {
         do { store = try MachineStore(root: MachineStore.defaultRoot) } catch { self.error = error.localizedDescription }
         #if os(macOS)
         DosMacAppDelegate.machineSession = session
-        session.onState = { [weak self] in self?.state = $0 }
+        session.onState = { [weak self] state in
+            self?.state = state
+            if case .failed(let message) = state { self?.error = message }
+        }
         session.onDisplayError = { [weak self] in self?.error = $0 }
         session.onFrame = { [weak self] frame in
             guard let provider = CGDataProvider(data: frame.pixels as CFData) else { return }
@@ -73,6 +76,37 @@ final class MachineLibraryModel: ObservableObject {
         defer { accessed.forEach { $0.stopAccessingSecurityScopedResource() } }
         do { _ = try await store.createExchangeDisk(files: urls, into: current); await refresh() }
         catch { self.error = error.localizedDescription }
+    }
+    func openSharedDisk() async {
+        guard let store, var machine = current, !active, !busy else { return }
+        busy = true; defer { busy = false }
+        #if os(macOS)
+        do {
+            let directory = store.directory(for: machine.id)
+            try SharedStorage.ensureDisk(in: directory)
+            machine.sharedDisk = true
+            try await store.save(machine); await refresh()
+            let volume = try await SharedStorage.mountForHost(in: directory)
+            NSWorkspace.shared.open(volume)
+        } catch { self.error = error.localizedDescription }
+        #else
+        error = "Host disk access is currently available on Mac."
+        #endif
+    }
+    func openSharedFolder() async {
+        guard let store, var machine = current, !busy else { return }
+        #if os(macOS)
+        do {
+            guard !active || machine.sharedFolder == true else { throw VMError.invalid("Stop this computer once to enable its shared folder.") }
+            guard SharedFolderServer.executable() != nil else { throw VMError.invalid("This build needs its embedded sharing engine. Rebuild with Samba bundled.") }
+            let folder = try SharedFolderServer.folder(in: store.directory(for: machine.id))
+            machine.sharedFolder = true
+            try await store.save(machine); await refresh()
+            NSWorkspace.shared.open(folder)
+        } catch { self.error = error.localizedDescription }
+        #else
+        error = "Live host sharing is currently available on Mac."
+        #endif
     }
     func exportExchange(_ media: MachineMedia, destination: URL) async {
         guard let store, let current, !active, !busy else { return }
@@ -170,6 +204,27 @@ final class MachineLibraryModel: ObservableObject {
         error = "The embedded iPhone machine engine is not available yet."
         #endif
     }
+    func installWindows9x(guest: GuestSystem, productKey: String, acceptedLicense: Bool) {
+        #if os(macOS)
+        guard let store, !active, !busy else { return }
+        busy = true; operationMessage = "Preparing \(guest.title)…"
+        installationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.busy = false; self.operationMessage = nil; self.installationTask = nil }
+            do {
+                let machine = try await Windows9xProvisioner().prepare(guest: guest, productKey: productKey, acceptedLicense: acceptedLicense, store: store) { [weak self] message in
+                    await MainActor.run { self?.operationMessage = message }
+                }
+                await self.refresh(); self.selected = machine.id
+                try await self.session.start(machine, directory: store.directory(for: machine.id))
+                await self.runWindows9xAssistant(machine)
+            } catch is CancellationError { await self.refresh() }
+            catch { self.error = error.localizedDescription; await self.refresh() }
+        }
+        #else
+        error = "The embedded iPhone machine engine is not available yet."
+        #endif
+    }
 
     func continueInstallationAssistant() {
         #if os(macOS)
@@ -179,7 +234,9 @@ final class MachineLibraryModel: ObservableObject {
             guard let self else { return }
             defer { self.busy = false; self.operationMessage = nil; self.installationTask = nil }
             switch machine.installation?.stage {
-            case .windowsSetup: await self.runWindowsAssistant(machine)
+            case .windowsSetup:
+                if machine.guest.needsCD { await self.runWindows9xAssistant(machine) }
+                else { await self.runWindowsAssistant(machine) }
             case .wordSetup: await self.runWordAssistant(machine)
             case .dosSetup: await self.runDOSAssistant(machine)
             default: break
@@ -193,6 +250,32 @@ final class MachineLibraryModel: ObservableObject {
     func cancelAssistant() { installationTask?.cancel() }
 
     #if os(macOS)
+    private func runWindows9xAssistant(_ original: Machine) async {
+        guard let store else { return }
+        var machine = original
+        do {
+            if machine.boot == .hardDisk, machine.installation?.recipeID == Windows9xRecipe.id(for: machine.guest), try await session.isAtDOSPrompt() {
+                try await session.typeText("C:\\DMINST.BAT\n")
+            }
+            let finished = try await Windows9xInstaller(session: session).run { [weak self] message, attention in
+                self?.operationMessage = message
+                machine.installation?.message = message; machine.installation?.needsAttention = attention
+                try? await store.save(machine); await self?.refresh()
+            } staged: {
+                machine.boot = .hardDisk
+                try await store.save(machine)
+            }
+            if finished {
+                machine.boot = .hardDisk; machine.installation?.stage = .complete
+                machine.installation?.needsAttention = false
+                try await store.save(machine); await refresh()
+            }
+        } catch {
+            machine.installation?.message = error is CancellationError ? "Assistant paused. Continue from the guest screen without reinstalling." : error.localizedDescription
+            machine.installation?.needsAttention = true
+            try? await store.save(machine); await refresh()
+        }
+    }
     private func runDOSAssistant(_ original: Machine) async {
         guard let store else { return }
         var machine = original
@@ -378,7 +461,7 @@ struct MachineLibraryView: View {
                                 #endif
                             } else { Button("Start machine") { Task { await model.launch() } }.buttonStyle(.borderedProminent).disabled(model.busy) }
                         }
-                        if let stage = machine.installation?.stage, stage == .wordSetup || stage == .complete {
+                        if !machine.guest.needsCD, let stage = machine.installation?.stage, stage == .wordSetup || stage == .complete {
                             HStack {
                                 Button("Start Windows") { Task { await model.launchWindows(word: false) } }
                                 if stage == .complete { Button("Start Word 6") { Task { await model.launchWindows(word: true) } } }

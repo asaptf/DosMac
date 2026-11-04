@@ -19,7 +19,7 @@ public enum GuestSystem: String, Codable, CaseIterable, Sendable {
     }
     public var cpu: String { self == .windows95 || self == .windows98 ? "pentium" : "486" }
     public var memoryMB: Int { self == .windows98 ? 64 : (self == .windows95 ? 32 : 16) }
-    public var diskMB: Int { self == .windows98 ? 4096 : (self == .windows95 ? 2048 : 512) }
+    public var diskMB: Int { needsCD ? 1024 : 512 }
     public var needsCD: Bool { self == .windows95 || self == .windows98 }
 }
 
@@ -65,6 +65,8 @@ public struct Machine: Codable, Identifiable, Equatable, Sendable {
     public var cdroms: [MachineMedia]
     public let createdAt: Date
     public var installation: InstallationRecord?
+    public var sharedDisk: Bool?
+    public var sharedFolder: Bool?
 
     public init(id: UUID = UUID(), name: String, guest: GuestSystem, boot: BootDevice = .floppy, floppies: [MachineMedia] = [], cdroms: [MachineMedia] = []) {
         self.id = id; self.name = name; self.guest = guest; self.boot = boot

@@ -24,7 +24,10 @@ struct MachineTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("DosMacQEMU-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try MachineStore(root: root.appendingPathComponent("Machines"))
-        var machine = try await store.create(name: "QEMU smoke", guest: .msdos622)
+        // Option-like user names must never be mistaken for argument-vector switches.
+        var machine = try await store.create(name: "-net", guest: .msdos622)
+        machine.sharedDisk = true
+        machine.sharedFolder = ProcessInfo.processInfo.environment["DOSMAC_TEST_SAMBA"] == "1"
         let first = root.appendingPathComponent("DISK1.img"), second = root.appendingPathComponent("DISK2.img"), cd = root.appendingPathComponent("SETUP.iso")
         try Self.bootDisk(message: "DOSMAC VM READY").write(to: first)
         try Self.bootDisk(message: "DOSMAC DISK TWO").write(to: second)

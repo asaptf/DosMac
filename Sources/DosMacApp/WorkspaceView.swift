@@ -24,12 +24,14 @@ struct WorkspaceView: View {
     case source(String)
     case computer(Bool)
     case shortcut(GuestApplication?)
+    case windows9x(GuestSystem)
     case classicSettings, startup
     var id: String {
       switch self {
       case .source(let url): "source-" + url
       case .computer(let new): "computer-\(new)"
       case .shortcut(let app): "shortcut-" + (app?.id.uuidString ?? "new")
+      case .windows9x(let guest): "install-" + guest.rawValue
       case .classicSettings: "settings"
       case .startup: "startup"
       }
@@ -117,6 +119,8 @@ struct WorkspaceView: View {
         #endif
       case .shortcut(let app):
         GuestApplicationForm(machines: machines.machines, apps: apps, existing: app)
+      case .windows9x(let guest):
+        Windows9xInstallView(model: machines, initialGuest: guest, otherSessionRunning: library.running)
       case .classicSettings: ScrollView { EngineSettings(model: library).padding(28) }
       case .startup:
         if let program = library.current { StartupSettings(model: library, program: program) }
@@ -462,7 +466,18 @@ struct WorkspaceView: View {
           Spacer()
           Button("Add from a link…") { sheet = .source("") }
         }
-        if !catalog.searched { referenceCollection }
+        if !catalog.searched {
+          referenceCollection
+          VStack(alignment: .leading, spacing: 15) {
+            Text("Windows 95 & 98").font(.title2.bold())
+            Text("Create a private desktop with its installation CD, shared disk, and live host folder. Experimental batch setup; use your own Windows product key.")
+              .font(.callout).foregroundStyle(.secondary)
+            HStack {
+              Button("Install Windows 98 SE…") { sheet = .windows9x(.windows98) }
+              Button("Install Windows 95…") { sheet = .windows9x(.windows95) }
+            }.disabled(machines.active || machines.busy || library.running)
+          }.padding(24).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+        }
         if catalog.busy {
           HStack {
             ProgressView().controlSize(.small)
@@ -549,6 +564,8 @@ struct WorkspaceView: View {
           pageHeading("Computers", subtitle: "The desktops behind your library.")
           Spacer()
           Menu("New computer") {
+            Button("Install Windows 98 SE…") { sheet = .windows9x(.windows98) }
+            Button("Install Windows 95…") { sheet = .windows9x(.windows95) }
             Button("Install Windows 3.1 + Word 6") { installReference() }
             Button("Create a blank computer…") { sheet = .computer(true) }
           }.disabled(machines.active || machines.busy)
@@ -621,6 +638,15 @@ struct WorkspaceView: View {
             Button("Pause assistant") { machines.cancelAssistant() }
           }.padding(13).background(
             workspaceMint.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+        }
+        if !machines.busy, let installation = machines.current?.installation,
+          installation.stage != .complete {
+          HStack {
+            Text(installation.message).font(.callout).foregroundStyle(.secondary)
+            Spacer()
+            Button("Continue installation") { machines.continueInstallationAssistant() }
+              .disabled(!machines.active)
+          }.padding(13).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
         }
         #if os(macOS)
           if machines.active {
@@ -742,7 +768,9 @@ struct WorkspaceView: View {
     playingMedia = []
     switch entry.target {
     case .word: await machines.launchWindows(word: true)
-    case .windows: await machines.launchWindows(word: false)
+    case .windows:
+      if let machine = machines.current, machine.guest.needsCD { openComputer(machine) }
+      else { await machines.launchWindows(word: false) }
     case .guest(let app):
       playingMedia = app.mediaIDs
       await machines.launchApplication(app)
@@ -908,6 +936,28 @@ private struct WorkspaceFilesView: View {
           Picker("Computer", selection: $model.selected) {
             ForEach(model.machines) { Text($0.name).tag(Optional($0.id)) }
           }.disabled(model.active || model.busy)
+          VStack(alignment: .leading, spacing: 15) {
+            Label("Live shared folder · Windows 9x", systemImage: "network").font(.title2.bold())
+            Text("Files in this folder are available to both your Mac and the running Windows computer. Only this computer’s Shared folder is exposed.")
+              .font(.callout).foregroundStyle(.secondary)
+            Text(verbatim: "\\\\10.0.2.4\\DOSMAC").font(.system(.body, design: .monospaced)).textSelection(.enabled)
+            Button(model.current?.sharedFolder == true ? "Open shared folder in Finder" : "Enable & open shared folder") {
+              Task { await model.openSharedFolder() }
+            }.disabled(model.busy || (model.active && model.current?.sharedFolder != true))
+            Text("In Windows, use Map Network Drive with this path. Requires the AMD PCnet adapter, TCP/IP, and Client for Microsoft Networks. DOS and Windows 3.1 can use the shared disk below without network drivers.")
+              .font(.caption).foregroundStyle(.secondary)
+          }.padding(24).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+          VStack(alignment: .leading, spacing: 15) {
+            Label("Shared disk · D:", systemImage: "externaldrive.fill").font(.title2.bold())
+            Text("A 64 MB disk for your documents, folders, and programs. Open it in Finder while the computer is stopped; DosMac ejects it from your Mac before starting DOS or Windows.")
+              .font(.callout).foregroundStyle(.secondary)
+            Button(model.current?.sharedDisk == true ? "Open shared disk in Finder" : "Create & open shared disk") {
+              Task { await model.openSharedDisk() }
+            }.buttonStyle(.borderedProminent).foregroundStyle(workspaceBase)
+              .disabled(model.active || model.busy)
+            Text("Available as D: on a computer with a single C: partition. CD-ROM letters may move. Finish saving on both systems before switching.")
+              .font(.caption).foregroundStyle(.secondary)
+          }.padding(24).background(workspaceMint.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
           VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 18) {
               Image(systemName: "arrow.left.arrow.right").font(.largeTitle).foregroundStyle(

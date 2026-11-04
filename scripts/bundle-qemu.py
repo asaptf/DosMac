@@ -23,6 +23,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", required=True, type=Path)
     parser.add_argument("--qemu", default=shutil.which("qemu-system-i386"), type=Path)
+    samba = next((p for p in [shutil.which("samba-dot-org-smbd"),
+                              "/opt/homebrew/sbin/samba-dot-org-smbd", "/usr/local/sbin/samba-dot-org-smbd"]
+                  if p and Path(p).is_file()), None)
+    parser.add_argument("--samba", default=samba, type=Path)
     args = parser.parse_args()
     if not args.qemu or not args.qemu.exists():
         parser.error("A developer QEMU installation is required to build the bundled app.")
@@ -56,6 +60,11 @@ def main():
                 source = original.parent / dependency.removeprefix("@loader_path/")
             elif dependency.startswith("@rpath/"):
                 source = prefix / "lib" / Path(dependency).name
+                if not source.exists() and args.samba:
+                    samba_prefix = args.samba.resolve().parent.parent
+                    source = next((p for p in [samba_prefix / "lib" / Path(dependency).name,
+                                               samba_prefix / "lib/private" / Path(dependency).name]
+                                   if p.exists()), source)
             else:
                 source = Path(dependency)
             if source.resolve() == original:
@@ -71,7 +80,10 @@ def main():
 
     for name in ["qemu-system-i386", "qemu-img"]:
         copy_binary(prefix / "bin" / name, destination / "bin" / name)
-    firmware = ["bios-256k.bin", "bios.bin", "vgabios-cirrus.bin", "vgabios-stdvga.bin", "kvmvapic.bin"]
+    if args.samba:
+        copy_binary(args.samba, destination / "bin/smbd")
+        shutil.copy2(args.samba.resolve().parent.parent / "COPYING", destination / "SAMBA-COPYING.txt")
+    firmware = ["bios-256k.bin", "bios.bin", "vgabios-cirrus.bin", "vgabios-stdvga.bin", "kvmvapic.bin", "efi-pcnet.rom"]
     for name in firmware:
         shutil.copy2(prefix / "share/qemu" / name, destination / "share/qemu" / name)
     shutil.copytree(prefix / "share/qemu/keymaps", destination / "share/qemu/keymaps")

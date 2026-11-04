@@ -24,6 +24,8 @@ The native player keeps controls above the screen and puts floppies/CD-ROM in a 
 
 Files separates a native computer's transfer floppies from imported packages' shared D: folder. Native transfer preparation/export remains limited to a stopped computer. Imported-package files retain ordinary file import and share/export controls, including in the iPhone library preview.
 
+Native computers can additionally use a 64 MiB shared hard disk, opened in Finder only while stopped and automatically detached before guest boot. Windows 9x can use a live, app-private network folder. Discover and Computers expose the Windows 95/98 experimental setup sheet. See [host sharing and Windows 9x](host-sharing-and-windows9x.md) for the ownership rules, driver requirements, source media and validation status.
+
 ## Validation
 
 Parser fixtures cover product links, result deduplication, Archive identifiers, private/oversized/traversal file rejection, and URL query encoding. Guest-library tests cover persistence, identity-preserving edits, ordered media, and rejecting command metacharacters or path traversal. macOS and iPhone simulator builds validate the shared UI. Native PC boot/input/media/display tests remain part of CI; commercial-media installation tests stay opt-in.

@@ -85,6 +85,62 @@ public struct FAT12Disk {
         disk.replaceSubrange(512..<(10*512), with: fat); disk.replaceSubrange((10*512)..<(19*512), with: fat)
         return disk
     }
+
+    /// Patch support files without moving IO.SYS, its directory entry, or the original boot sector.
+    public func replacing(files: [String: Data]) throws -> Data {
+        guard sectorSize == 512, rootEntries > 0 else { throw VMError.invalid("Use a standard FAT12 startup disk.") }
+        var result = image
+        let fatStart = reserved * sectorSize, fatEnd = fatStart + fatSectors * sectorSize
+        let clusterBytes = clusterSectors * sectorSize
+        let clusterLimit = min(0xff0, (image.count - dataOffset) / clusterBytes + 2)
+        guard fatEnd <= rootOffset, fatEnd - fatStart >= (clusterLimit * 3 + 1) / 2 else { throw VMError.invalid("Invalid startup disk FAT.") }
+        func value(_ cluster: Int) -> Int {
+            let at = fatStart + cluster + cluster / 2
+            let word = Int(result.le16(at))
+            return cluster & 1 == 0 ? word & 0xfff : word >> 4
+        }
+        func set(_ cluster: Int, _ next: Int) {
+            let at = fatStart + cluster + cluster / 2, old = Int(result.le16(at))
+            result.putLE16(UInt16(cluster & 1 == 0 ? (old & 0xf000) | next : (old & 0x000f) | (next << 4)), at: at)
+        }
+        for (name, bytes) in files.sorted(by: { $0.key < $1.key }) {
+            guard name.range(of: "^[A-Z0-9_]{1,8}(\\.[A-Z0-9_]{1,3})?$", options: .regularExpression) != nil else { throw VMError.invalid("Invalid startup support filename.") }
+            let parts = name.split(separator: ".")
+            let short = Data((String(parts[0]).padding(toLength: 8, withPad: " ", startingAt: 0) + (parts.count > 1 ? String(parts[1]) : "").padding(toLength: 3, withPad: " ", startingAt: 0)).utf8)
+            let offsets = stride(from: rootOffset, to: rootOffset + rootEntries * 32, by: 32)
+            let existing = offsets.first { result[$0] != 0xe5 && Data(result[$0..<($0 + 11)]) == short }
+            guard let entry = existing ?? offsets.first(where: { result[$0] == 0 || result[$0] == 0xe5 }) else { throw VMError.invalid("The startup disk directory is full.") }
+            if existing != nil {
+                guard result[entry + 11] & 0x18 == 0 else { throw VMError.invalid("Cannot replace a startup directory.") }
+                var cluster = Int(result.le16(entry + 26)), seen = Set<Int>()
+                while cluster >= 2 && cluster < 0xff0 {
+                    guard cluster < clusterLimit, seen.insert(cluster).inserted else { throw VMError.invalid("Invalid startup file chain.") }
+                    let next = value(cluster); set(cluster, 0); cluster = next
+                }
+            }
+            let count = (bytes.count + clusterBytes - 1) / clusterBytes
+            let free = Array((2..<clusterLimit).lazy.filter { value($0) == 0 }.prefix(count))
+            guard free.count == count else { throw VMError.invalid("Startup support files do not fit on the boot disk.") }
+            result.replaceSubrange(entry..<(entry + 32), with: Data(repeating: 0, count: 32))
+            result.replaceSubrange(entry..<(entry + 11), with: short); result[entry + 11] = 0x20
+            for field in [16, 18, 24] { result.putLE16(0x0021, at: entry + field) }
+            result.putLE16(UInt16(free.first ?? 0), at: entry + 26)
+            result.putLE32(UInt32(bytes.count), at: entry + 28)
+            for (index, cluster) in free.enumerated() {
+                set(cluster, index + 1 < free.count ? free[index + 1] : 0xfff)
+                let offset = dataOffset + (cluster - 2) * clusterBytes
+                result.replaceSubrange(offset..<(offset + clusterBytes), with: Data(repeating: 0, count: clusterBytes))
+                let lower = index * clusterBytes, upper = min(bytes.count, lower + clusterBytes)
+                result.replaceSubrange(offset..<(offset + upper - lower), with: bytes[lower..<upper])
+            }
+        }
+        let fat = Data(result[fatStart..<fatEnd])
+        for copy in 1..<fatCount {
+            let start = fatStart + copy * fatSectors * sectorSize
+            result.replaceSubrange(start..<(start + fat.count), with: fat)
+        }
+        return result
+    }
 }
 
 extension Data {

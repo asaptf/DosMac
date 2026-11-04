@@ -37,6 +37,37 @@ public actor MachineStore {
         try fm.moveItem(at: staging, to: directory(for: machine.id))
         return machine
     }
+    public func createWindows9x(guest: GuestSystem, iso: URL, bootDisk: URL, productKey: String, acceptedLicense: Bool) async throws -> Machine {
+        guard guest.needsCD, let engine = QEMUInstallation.find() else { throw VMError.invalid("Windows 9x requires the managed PC engine.") }
+        var machine = Machine(name: guest.title, guest: guest, boot: .floppy)
+        machine.sharedDisk = true
+        machine.sharedFolder = SharedFolderServer.executable() != nil
+        machine.installation = InstallationRecord(recipeID: Windows9xRecipe.id(for: guest), stage: .windowsSetup, message: "Ready to prepare the new Windows hard disk.")
+        let staging = root.appendingPathComponent(".create-\(machine.id.uuidString)")
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try fm.createDirectory(at: staging.appendingPathComponent("Media"), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: staging) }
+        let raw = staging.appendingPathComponent("system.raw")
+        try SharedDiskImage.createSystemImage(at: raw)
+        try await ChildProcess.run(engine.imageTool, arguments: ["convert", "-f", "raw", "-O", "qcow2", raw.path, staging.appendingPathComponent("disk.qcow2").path])
+        try fm.removeItem(at: raw)
+        let values = try iso.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0, (values.fileSize ?? Int.max) <= 1024 * 1024 * 1024 else { throw VMError.invalid("Select a Windows installation ISO up to 1 GiB.") }
+        let startup = try FAT12Disk(data: Data(contentsOf: bootDisk))
+        for required in ["IO.SYS", "COMMAND.COM", "HIMEM.SYS", "OAKCDROM.SYS", "MSCDEX.EXE", "EBD.CAB", "EXTRACT.EXE", "FDISK.EXE"] {
+            guard startup.fileNames.contains(required) else { throw VMError.invalid("Use the English Windows 98 SE OEM startup disk with CD-ROM support.") }
+        }
+        let boot = MachineMedia(name: "DosMac Windows startup disk", relativePath: "Media/\(UUID().uuidString).img", purpose: .dosSetup)
+        let cd = MachineMedia(name: guest.title + " installation CD", relativePath: "Media/\(UUID().uuidString).iso", purpose: .windowsSetup)
+        try startup.replacing(files: Windows9xRecipe.bootFiles(guest: guest, productKey: productKey, acceptedLicense: acceptedLicense, sharing: machine.sharedFolder == true)).write(to: staging.appendingPathComponent(boot.relativePath))
+        try fm.copyItem(at: iso, to: staging.appendingPathComponent(cd.relativePath))
+        machine.floppies = [boot]; machine.cdroms = [cd]
+        try machine.validate()
+        try Task.checkCancellation()
+        try JSONEncoder().encode(machine).write(to: staging.appendingPathComponent("machine.json"))
+        try fm.moveItem(at: staging, to: directory(for: machine.id))
+        return machine
+    }
     #endif
 
     public func importMedia(_ sources: [URL], into original: Machine, cdrom: Bool, purpose: MediaPurpose? = nil, names: [String]? = nil) throws -> Machine {

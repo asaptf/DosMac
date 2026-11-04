@@ -62,6 +62,14 @@ struct LibraryEntry: Identifiable {
   {
     var entries: [LibraryEntry] = []
     for machine in machines {
+      if machine.guest.needsCD {
+        if machine.installation?.stage == .complete {
+          entries.append(Self(id: "windows-\(machine.id)", title: machine.guest.title,
+            summary: "Your Windows desktop, programs, and shared files.", context: machine.name,
+            symbol: "desktopcomputer", kind: "DESKTOP", target: .windows(machine.id)))
+        }
+        continue
+      }
       if machine.installation?.stage == .complete {
         entries.append(
           Self(

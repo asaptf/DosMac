@@ -22,20 +22,30 @@ public final class MachineSession {
     private var machine: Machine?
     private var directory: URL?
     private var log: FileHandle?
+    private var sharing: SharedFolderServer?
 
     public init() { }
     public var isActive: Bool { process?.isRunning == true }
 
     public func start(_ machine: Machine, directory: URL, muted: Bool = false) async throws {
-        guard !isActive else { throw VMError.invalid("Stop the active machine first.") }
+        guard !isActive, state != .starting else { throw VMError.invalid("Stop the active machine first.") }
         guard let engine = QEMUInstallation.find() else { throw VMError.engineMissing }
         try machine.validate()
+        state = .starting
+        do {
+            if machine.sharedDisk == true { try await SharedStorage.prepareForGuest(in: directory) }
+        } catch { state = .failed(error.localizedDescription); throw error }
         let runtime = URL(fileURLWithPath: "/tmp/dosmac-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         self.runtime = runtime; self.machine = machine; self.directory = directory
+        if machine.sharedFolder == true {
+            let server = SharedFolderServer()
+            do { try await server.start(directory: directory, runtime: runtime); sharing = server }
+            catch { await cleanup(); state = .failed(error.localizedDescription); throw error }
+        }
         let input = Pipe(), output = Pipe()
         let task = Process(); task.executableURL = engine.executable
-        task.arguments = try QEMUArguments.make(machine: machine, directory: directory, runtime: runtime, installation: engine, muted: muted)
+        task.arguments = try QEMUArguments.make(machine: machine, directory: directory, runtime: runtime, installation: engine, muted: muted, sharingPort: sharing?.port)
         task.currentDirectoryURL = directory
         let logURL = directory.appendingPathComponent("qemu.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
@@ -97,7 +107,7 @@ public final class MachineSession {
         }
         if let process, process.isRunning { process.terminate() }
     }
-    public func terminate() { if let process, process.isRunning { process.terminate() } }
+    public func terminate() { if let process, process.isRunning { process.terminate() }; sharing?.stop(); sharing = nil }
 
     public func key(qcode: String, down: Bool) async throws {
         guard let qmp else { throw VMError.notRunning }
@@ -233,6 +243,7 @@ public final class MachineSession {
     private func receive(_ frame: VMFrame) { latestFrame = frame; textDisplay = frame.width == 720 && frame.height == 400; onFrame?(frame) }
     private func displayFailed(_ message: String) { onDisplayError?(message) }
     private func cleanup() async {
+        sharing?.stop(); sharing = nil
         if let display { await display.stop() }; self.display = nil
         if let qmp { await qmp.close() }; self.qmp = nil
         try? log?.close(); log = nil

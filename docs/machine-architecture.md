@@ -43,6 +43,8 @@ Imported disk sets retain their labels and purpose: DOS Setup, Windows Setup, or
 
 Host/guest file exchange must use a controlled transfer medium or a guest agent. The legacy folder-backed Exchange drive is not automatically exposed to real MS-DOS/Windows machines. A bounded FAT12 reader/writer supports persistent exchange floppies. The UI can create blank disks or populate them with Mac files, insert them through the ordinary drive panel, and export their root files into a fresh host folder while stopped. The first implementation is limited to 1.44 MB and strict DOS 8.3 names using letters, digits and underscores. It rejects symlink inputs and never replaces existing host files.
 
+The current Files workspace also offers a 64 MiB FAT16 IDE disk with exclusive host/guest ownership. macOS mounting happens only while QEMU is stopped, and startup performs a non-forced detach. A separate, private Samba process exposes a machine-owned folder to Windows 9x through restricted QEMU guest forwarding. It does not use macOS system File Sharing. See [host sharing and Windows 9x](host-sharing-and-windows9x.md).
+
 ## One-click installation model
 
 One click should start a tested, versioned recipe, not a generic sequence of blind Enter presses. A recipe must identify exact release media, group disks, create a machine, choose boot order, observe expected installer screens, mount the requested disk/CD, and verify the installed product before recording completion.
@@ -50,6 +52,8 @@ One click should start a tested, versioned recipe, not a generic sequence of bli
 The current reference provisioner prepares all three release disk sets in a fresh machine and starts the DOS assistant. Unknown DOS prompts and license review stop automation with a visible needs-attention state. DOS is marked installed only after booting from HDD and observing version 6.22. Windows 3.1 is staged on HDD and installed with its original SETUP.SHH schema. Word 6 requires separate DISK1–DISK9 folders, matching the relative paths in WINWORD6.INF, and SHARE.EXE. Its quiet installer runs inside Windows. Each batch uses a fresh acknowledgement token, checks installed files, and flushes SMARTDrive before completion. Graphical errors are observed with macOS Vision and handed back for review. Word’s exact successful-completion notice is acknowledged once; installed files are checked afterward. The default owner is “DosMac User”; a custom identity form, recovery snapshots and resumable downloads are still pending. Downloading media alone never marks a product installed.
 
 Windows 3.1 supports batch Setup via `/H:<answer-file>`; use the exact release's SETUP.SHH schema. The selected Word 6 release has its own recipe; this does not cover every Word/Office edition. Windows 95/98 need boot/CD variants, version-specific unattended files, driver profiles, and post-reboot verification. Some 95 CDs are not bootable and require a boot floppy. These are separate recipes, not assumptions hidden in the generic machine profile.
+
+Windows9xRecipe now provisions pinned English CD media, patches an OEM startup floppy without moving its kernel, and stages Setup onto a new FAT16 system disk. The partition uses LBA type 0x0E and whole 64-head/63-sector BIOS cylinders; the BPB and QEMU geometry agree, including the final cluster. Original DOS helper programs acknowledge flushed staging and first-Windows-start completion. License and product-key review remains explicit. Full desktop acceptance is tracked separately from reaching Setup.
 
 ## Engine delivery
 
