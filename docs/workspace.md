@@ -28,4 +28,6 @@ Files separates a native computer's transfer floppies from imported packages' sh
 
 Parser fixtures cover product links, result deduplication, Archive identifiers, private/oversized/traversal file rejection, and URL query encoding. Guest-library tests cover persistence, identity-preserving edits, ordered media, and rejecting command metacharacters or path traversal. macOS and iPhone simulator builds validate the shared UI. Native PC boot/input/media/display tests remain part of CI; commercial-media installation tests stay opt-in.
 
+Native macOS visual acceptance was completed on November 4, 2026: Library cards and navigation, a live Internet Archive search returning 24 Microsoft Word results, release inspection, both Files modes, Computers, and the session disk popover. Opening Word 6 from Library booted the reference computer and reached its document editor. Returning to Library and choosing Open session preserved the running Windows session. This check did not install another release or modify guest documents.
+
 References: [WinWorld search](https://winworldpc.com/search), [Internet Archive metadata API](https://archive.org/developers/md-read.html).
