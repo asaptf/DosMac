@@ -61,6 +61,23 @@ struct GuestPointerTests {
                 try #require(session.frameSnapshot()?.height == 600)
                 try #require(bridge.current == target)
                 print("Confirmed real Windows framebuffer at 800 x 600")
+                let startX = GuestPointer.coordinate(20, extent: 800)
+                let startY = GuestPointer.coordinate(585, extent: 600)
+                try await session.absolutePointer(x: startX, y: startY)
+                try await Task.sleep(for: .seconds(1))
+                try await session.absolutePointer(x: startX, y: startY, button: "left", down: true)
+                try await Task.sleep(for: .milliseconds(150))
+                try await session.absolutePointer(x: startX, y: startY, button: "left", down: false)
+                let menuDeadline = Date().addingTimeInterval(8)
+                var startOpened = false
+                while Date() < menuDeadline {
+                    let text = try await session.observeScreenText().lowercased().filter { $0.isLetter }
+                    if text.contains("windowsupdate") && text.contains("favorites") && text.contains("documents") { startOpened = true; break }
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                try #require(startOpened)
+                try await session.tap("esc")
+                print("Confirmed actual mouse click opens the Windows Start menu after resizing")
                 bridge.setAutomatic(true)
                 bridge.fit(width: 1100, height: 800)
                 let fitDeadline = Date().addingTimeInterval(15)

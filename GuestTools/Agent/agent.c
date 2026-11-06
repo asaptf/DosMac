@@ -113,7 +113,7 @@ static void poll(void) {
     if(word(&p,"DMAC1 HELLO ")) {
         if(!readToken(&p,incoming) || !equal(p,"\n")) return;
         if(!equal(token,incoming)) { unsigned i; for(i=0;i<33;i++) token[i]=incoming[i]; hasID=0; helloPublished=0; }
-        if(!helloPublished) helloPublished=ready();
+        if(!helloPublished) { helloPublished=ready(); }
         return;
     }
     p=input;
@@ -122,8 +122,23 @@ static void poll(void) {
     if(w<640 || h<480 || w>1600 || h>1200 || (hasID && id==lastID)) return;
     resize(id,w,h);
 }
+static BOOL registerStartup(void) {
+    const char installed[]="C:\\DMTOOLS\\DMAGENT.EXE";
+    char path[260]; unsigned i; HANDLE key=0; DWORD disposition=0;
+    DWORD length=GetModuleFileNameA(0,path,sizeof(path));
+    if(length!=sizeof(installed)-1) return 0;
+    for(i=0;i<length;i++) {
+        char a=path[i], b=installed[i];
+        if(a>='a' && a<='z') a-=32;
+        if(a!=b) return 0;
+    }
+    if(RegCreateKeyExA((HANDLE)0x80000002,"Software\\Microsoft\\Windows\\CurrentVersion\\Run",0,0,0,2,0,&key,&disposition)!=0) return 0;
+    LONG result=RegSetValueExA(key,"DosMacDisplay",0,1,(const BYTE *)installed,sizeof(installed));
+    RegCloseKey(key); return result==0;
+}
 void CALL AgentMain(void) {
     HANDLE singleton=CreateMutexA(0,0,"DosMacDisplayAgentV1");
     if(!singleton || GetLastError()==183) ExitProcess(0);
+    if(!registerStartup()) ExitProcess(1);
     for(;;) { pump(500); poll(); }
 }

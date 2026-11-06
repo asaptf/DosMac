@@ -229,7 +229,7 @@ final class MachineLibraryModel: ObservableObject {
                 let files = try GuestToolsMedia.mouseFiles(
                     driver: asset("qemouse.drv", hash: "049b0cc00ba812c00fcf5c7b68e1676c827a3c7d3551bb248e280d18ce4d46b9"),
                     inf: asset("qemouse.inf", hash: "00cbdf229e586708081ae35a6840c8ffe99fbd8b8dd21137934bb28f829490f1"),
-                    agent: machine.sharedFolder == true ? asset("dmagent.exe", hash: "bf4df668842e6554160be6b55cd0f312910e38bee04dfa33d35eb6b80ca157e0") : nil)
+                    agent: machine.sharedFolder == true ? asset("dmagent.exe", hash: "b04762e23805477651f62cc6116b9b94d4940d4654ad3698f973cb56e4f837fb") : nil)
                 self.operationMessage = "Saving a recovery copy before installing Guest Tools…"
                 let directory = store.directory(for: machine.id)
                 let backup = directory.appendingPathComponent("Backups/GuestTools-\(UUID().uuidString)")

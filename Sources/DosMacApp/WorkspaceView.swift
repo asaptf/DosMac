@@ -639,6 +639,10 @@ struct WorkspaceView: View {
                 Button("Ctrl + Alt + Del") {
                   Task { try? await machines.session.sendChord(["ctrl", "alt", "delete"]) }
                 }
+                Button("Windows + R (Run)") { Task { try? await machines.session.sendChord(["meta_l", "r"]) } }
+                Button("Ctrl + Esc (Start menu)") { Task { try? await machines.session.sendChord(["ctrl", "esc"]) } }
+                Button("Alt + F4") { Task { try? await machines.session.sendChord(["alt", "f4"]) } }
+                Button("Enter") { Task { try? await machines.session.tap("ret") } }
                 Button("Escape") { Task { try? await machines.session.tap("esc") } }
                 Button("Computer settings") { sheet = .computer(false) }
               } label: {

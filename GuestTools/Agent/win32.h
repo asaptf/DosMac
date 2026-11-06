@@ -38,3 +38,7 @@ API BOOL CALL PostMessageA(HANDLE, DWORD, DWORD, LONG);
 API HANDLE CALL GetDC(HANDLE);
 API int CALL ReleaseDC(HANDLE, HANDLE);
 API int CALL GetDeviceCaps(HANDLE, int);
+API DWORD CALL GetModuleFileNameA(HANDLE, char *, DWORD);
+API LONG CALL RegCreateKeyExA(HANDLE, const char *, DWORD, char *, DWORD, DWORD, void *, HANDLE *, DWORD *);
+API LONG CALL RegSetValueExA(HANDLE, const char *, DWORD, DWORD, const BYTE *, DWORD);
+API LONG CALL RegCloseKey(HANDLE);

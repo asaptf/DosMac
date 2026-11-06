@@ -173,18 +173,11 @@ public final class MachineSession {
         for stroke in strokes {
             try Task.checkCancellation()
             let keys = stroke.shift ? ["shift", stroke.qcode] : [stroke.qcode]
-            if paced {
-                // QEMU send-key releases keys on a virtual timer. Under Win9x
-                // startup load that timer can overlap the next character.
-                for code in keys { try await key(qcode: code, down: true) }
-                do { try await Task.sleep(for: .milliseconds(60)) }
-                catch {
-                    for code in keys.reversed() { try? await key(qcode: code, down: false) }
-                    throw error
-                }
-                for code in keys.reversed() { try await key(qcode: code, down: false) }
-                try await Task.sleep(for: .milliseconds(90))
-            } else { try await sendChord(keys) }
+            // Keep modifier and character in one QEMU send-key operation.
+            // Mixing its delayed releases with separate input-send-event keys
+            // can release Shift midway through punctuation such as a drive colon.
+            try await sendChord(keys)
+            if paced { try await Task.sleep(for: .milliseconds(90)) }
         }
     }
     public func mountSupportDisk(files: [String: Data]) async throws {

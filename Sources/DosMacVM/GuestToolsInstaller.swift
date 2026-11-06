@@ -74,31 +74,48 @@ public struct GuestToolsInstaller {
     }
 
     private func run(_ command: String) async throws {
-        // Explorer can paint Start before it begins handling hotkeys. Retry the
-        // idempotent open action; never type a command until Run is observed.
-        var opened = false
+        // Boot-time windows can steal focus after Run first appears. Verify the
+        // visible command tail before Enter, rather than launching partial input.
+        func token(_ value: Substring) -> String {
+            String(value.split(separator: "\\").last ?? value).lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let words = command.split(separator: " ")
+        let executable = token(words[0]), filename = token(words[words.count - 1])
         for attempt in 0..<3 {
-            try await session.sendChord(["meta_l", "r"])
-            try await Task.sleep(for: .milliseconds(750))
             do {
+                try await session.sendChord(["meta_l", "r"])
+                try await Task.sleep(for: .milliseconds(750))
                 try await waitFor({ $0.contains("typethenameofaprogram") }, timeout: 5)
-                opened = true; break
+                try await session.sendChord(["alt", "o"])
+                try await session.tap("home")
+                try await session.sendChord(["shift", "end"])
+                try await session.tap("backspace")
+                try await session.typeText(command.lowercased(), paced: true)
+                try await Task.sleep(for: .milliseconds(500))
+                try await session.tap("home")
+                try await waitFor({ $0.contains("typethenameofaprogram") && $0.contains(executable) }, timeout: 5)
+                try await session.tap("end")
+                try await waitFor({ $0.contains("typethenameofaprogram") && $0.contains(filename) }, timeout: 5)
+                try await session.tap("ret")
+                try await waitFor({ !$0.contains("typethenameofaprogram") }, timeout: 10)
+                return
             } catch VMError.invalid(let message) where message.hasPrefix("Guest Tools paused") && attempt < 2 {
                 continue
             }
         }
-        guard opened else { throw VMError.invalid("Windows did not open Run. Review the guest before retrying Guest Tools.") }
-        try await Task.sleep(for: .milliseconds(500))
-        try await session.tap("home")
-        try await session.sendChord(["shift", "end"])
-        try await Task.sleep(for: .milliseconds(250))
-        try await session.typeText(command + "\n", paced: true)
-        try await waitFor({ !$0.contains("typethenameofaprogram") }, timeout: 10)
     }
 
     public func installMouse(files: [String: Data], report: (String) -> Void) async throws {
         report("Waiting for the Windows desktop…")
         try await waitFor({ $0.contains("start") && ($0.contains("mycomputer") || $0.contains("recyclebin")) }, timeout: 120)
+        // The first-boot Welcome web view can take focus after Explorer paints
+        // Start. Dismiss this known startup window before opening Run.
+        try await Task.sleep(for: .seconds(3))
+        let startup = try await session.observeScreenText().lowercased().filter { $0.isLetter || $0.isNumber }
+        if startup.contains("welcometowindows98") {
+            try await session.sendChord(["alt", "f4"])
+            try await waitFor({ !$0.contains("welcometowindows98") }, timeout: 10)
+        }
         let alreadyActive = session.absolutePointer
         let includesAgent = files["DMAGENT.EXE"] != nil
         if alreadyActive && (!includesAgent || session.guestDisplay?.ready == true) {
@@ -111,10 +128,6 @@ public struct GuestToolsInstaller {
         try await waitFor({ $0.contains("filesareready") }, timeout: 30)
         try await session.tap("ret")
         try await waitFor({ !$0.contains("filesareready") }, timeout: 8)
-        if includesAgent {
-            report("Installing the Windows display agent…")
-            try await run("C:\\WINDOWS\\RUNDLL.EXE SETUPX.DLL,InstallHinfSection DefaultInstall 128 C:\\DMTOOLS\\DMAGENT.INF")
-        }
         if alreadyActive { try await activateAgent(report: report); return }
         report("Applying the Windows mouse driver settings…")
         try await run("C:\\WINDOWS\\RUNDLL.EXE SETUPX.DLL,InstallHinfSection DefaultInstall 128 C:\\DMTOOLS\\QEMOUSE.INF")

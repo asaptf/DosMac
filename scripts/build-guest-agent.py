@@ -18,9 +18,10 @@ if not lld.exists():
 source = root / 'GuestTools/Agent/agent.c'
 output = root / 'Sources/DosMacApp/Resources/GuestTools/dmagent.exe'
 imports = {
-    'kernel32': [('CreateFileA',28),('ReadFile',20),('WriteFile',20),('CloseHandle',4),('Sleep',4),('ExitProcess',4),('CreateMutexA',12),('GetLastError',0)],
+    'kernel32': [('CreateFileA',28),('ReadFile',20),('WriteFile',20),('CloseHandle',4),('Sleep',4),('ExitProcess',4),('CreateMutexA',12),('GetLastError',0),('GetModuleFileNameA',12)],
     'user32': [('GetSystemMetrics',4),('EnumDisplaySettingsA',12),('ChangeDisplaySettingsA',8),('PeekMessageA',20),('TranslateMessage',4),('DispatchMessageA',4),('MsgWaitForMultipleObjects',20),('FindWindowA',8),('GetWindowRect',8),('PostMessageA',16),('GetDC',4),('ReleaseDC',8)],
     'gdi32': [('GetDeviceCaps',8)],
+    'advapi32': [('RegCreateKeyExA',36),('RegSetValueExA',24),('RegCloseKey',4)],
 }
 with tempfile.TemporaryDirectory(prefix='dosmac-agent-') as temp:
     work = Path(temp)

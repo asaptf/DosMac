@@ -89,6 +89,7 @@ final class GuestDisplayView: NSView {
     private var buttons = Set<String>()
     private var observer: NSObjectProtocol?
     override var acceptsFirstResponder: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { inputEnabled }
     override var isFlipped: Bool { false }
     override func resignFirstResponder() -> Bool { releaseCapture(); return super.resignFirstResponder() }
 
