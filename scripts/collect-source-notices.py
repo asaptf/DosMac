@@ -32,7 +32,7 @@ for component in manifest['components']:
         path = PurePosixPath(name)
         if path.is_absolute() or '..' in path.parts or '\\' in name or '\n' in name or size > 1_048_576:
             return
-        if not path.name.upper().startswith(('LICENSE','LICENCE','COPYING','COPYRIGHT','NOTICE','AUTHORS')):
+        if not path.name.upper().startswith(('LICENSE','LICENCE','COPYING','COPYRIGHT','NOTICE','AUTHORS')) and not any(part.upper() == 'LICENSES' for part in path.parts[:-1]):
             return
         target = output.joinpath(*path.parts)
         if not target.resolve().is_relative_to(output.resolve()): raise SystemExit('Unsafe output path')

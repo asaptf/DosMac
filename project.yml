@@ -54,9 +54,12 @@ targets:
   DosMac-AppStore:
     type: application
     platform: macOS
+    deploymentTarget: '27.0'
     info:
       path: Configuration/AppStore-Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         DosMacDistribution: app-store
     sources: [Sources/DosMacApp]
     dependencies:
@@ -79,9 +82,12 @@ targets:
   DosMac-SandboxProbe:
     type: application
     platform: macOS
+    deploymentTarget: '27.0'
     info:
       path: Configuration/SandboxProbe-Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         DosMacDistribution: app-store
         LSUIElement: true
     sources:

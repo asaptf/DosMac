@@ -18,6 +18,7 @@ struct OpenSourceNoticesView: View {
                             .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
                     }
                 }
+                Link("Native component source snapshot", destination: URL(string: "https://github.com/asaptf/DosMac/releases/tag/store-source-snapshot-2026-11-06-minimal")!)
                 Link("Project source and notices", destination: URL(string: "https://github.com/asaptf/DosMac")!)
                 Link("Privacy policy", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/privacy.md")!)
                 Link("Support", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/support.md")!)
@@ -39,8 +40,9 @@ struct OpenSourceNoticesView: View {
         if let walker = FileManager.default.enumerator(at: native, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]) {
             for case let file as URL in walker {
                 let name = file.lastPathComponent.uppercased()
-                if name.hasPrefix("COPYING") || name.hasPrefix("LICENSE") || name.hasPrefix("LICENCE") || name.hasPrefix("COPYRIGHT") || name.hasPrefix("NOTICE") {
-                    let relative = String(file.path.dropFirst(native.path.count + 1))
+                let relative = String(file.path.dropFirst(native.path.count + 1))
+                let licenseDirectory = relative.split(separator: "/").dropLast().contains { $0.uppercased() == "LICENSES" }
+                if name.hasPrefix("COPYING") || name.hasPrefix("LICENSE") || name.hasPrefix("LICENCE") || name.hasPrefix("COPYRIGHT") || name.hasPrefix("NOTICE") || name == "HOMEBREW-LICENSE.TXT" || licenseDirectory {
                     files.append((relative,file))
                 }
             }

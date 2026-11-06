@@ -37,6 +37,10 @@ This Mac edition includes its native emulation engine. You do not need to instal
 
 DOS,emulator,retro,PC,Windows,floppy,legacy,virtual machine
 
+## Initial test-build requirements
+
+Apple Silicon Mac running macOS 27 or later. Wider deployment requires rebuilding the complete native dependency graph; do not advertise macOS 14 compatibility for the current package.
+
 ## Proposed category
 
 Utilities. Confirm the final category and age-rating answers against the actual submission questionnaire.

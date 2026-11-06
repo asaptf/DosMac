@@ -4,7 +4,7 @@ DosMac's original project code is licensed under [Apache License 2.0](LICENSE). 
 
 ## QEMU machine backend
 
-The new machine manager invokes QEMU as an owned process and implements QMP/RFB protocols in Swift. No QEMU source or OS/application image is vendored in this repository. The local developer bundling script copies a developer-installed QEMU and its runtime dependencies into a local build artifact; this is not a publicly redistributable release package. QEMU, SeaBIOS, VGA BIOS and each linked library retain their own licenses. Before binary distribution, provide the applicable notices and corresponding source and complete signing/notarization. Sources: [QEMU](https://www.qemu.org/), [QEMU licensing](https://www.qemu.org/docs/master/about/license.html), [SeaBIOS](https://www.seabios.org/).
+The machine manager invokes QEMU as an owned process and implements QMP/RFB protocols in Swift. No commercial OS/application image is vendored in this repository. The developer bundler can copy a locally installed QEMU. The store preparation pipeline uses a checksum-pinned, project-built minimal QEMU with a recorded build recipe and binary hashes. QEMU is GPL-2.0 licensed; SeaBIOS, VGA BIOS and every linked library retain their own terms. Source evidence and notices are collected for the exact component inventory. Signed preparation artifacts are not App Store approval; complete source delivery, applicable terms and release validation remain necessary. Sources: [QEMU](https://www.qemu.org/), [QEMU licensing](https://www.qemu.org/docs/master/about/license.html), [SeaBIOS](https://www.seabios.org/).
 
 ## SWCompression 4.9.1 and BitByteData 2.1.0
 
@@ -45,3 +45,7 @@ The embedded mouse driver is GPL-2.0 licensed. Its exact corresponding source, l
 ## Homebrew build recipes
 
 Local source-evidence packages retain the exact installed Homebrew recipes, receipts, and pinned build inputs for the copied native components. Homebrew formula code retains its BSD-2-Clause license; see [the included text](Configuration/ThirdParty/Homebrew-LICENSE.txt). Source archives, recipe inputs, and source notice extraction are checksum-verified. Their collection does not establish compatibility with store terms or replace a complete corresponding-source review for the exact distributed build.
+
+## Private file-sharing service
+
+The embedded Samba server and its dependencies retain their upstream licenses, including Samba's GPL-3.0-or-later terms. It runs as a separate inherited-sandbox helper. Its exact component recipes, source inputs and license texts are included in the native source inventory and in-app notices. The minimal QEMU build disables the unused SSH backend; its native dependency graph is verified separately from the sharing helper's graph.

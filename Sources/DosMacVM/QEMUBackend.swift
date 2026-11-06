@@ -88,7 +88,10 @@ public enum QEMUArguments {
             args += ["-blockdev", try json(.object(["driver": .string("raw"), "node-name": .string("shared-disk"), "file": .object(["driver": .string("file"), "filename": .string(SharedStorage.image(in: directory).path)])])), "-device", "ide-hd,drive=shared-disk,bus=ide.0,unit=1,lcyls=131,lheads=16,lsecs=63,bios-chs-trans=none"]
         }
         // Stable drive identifiers for QMP media commands, even with empty trays.
-        args += ["-drive", "if=none,id=floppy0", "-device", "floppy,drive=floppy0,unit=0", "-drive", "if=none,id=cdrom0,media=cdrom,readonly=on", "-device", "ide-cd,drive=cdrom0,bus=ide.1,unit=0"]
+        // An empty drive otherwise defaults to 2.88 MB before the first image
+        // is inserted. Windows 9x machines use a stable 1.44 MB physical drive.
+        let floppy = "floppy,drive=floppy0,unit=0" + (machine.guest.needsCD ? ",drive-type=144" : "")
+        args += ["-drive", "if=none,id=floppy0", "-device", floppy, "-drive", "if=none,id=cdrom0,media=cdrom,readonly=on", "-device", "ide-cd,drive=cdrom0,bus=ide.1,unit=0"]
         args += ["-audiodev", muted ? "none,id=sound0" : "coreaudio,id=sound0", "-device", "sb16,audiodev=sound0"]
         if machine.sharedFolder == true {
             guard let sharingPort, sharingPort > 1024 else { throw VMError.invalid("The private shared folder is not ready.") }

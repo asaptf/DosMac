@@ -47,7 +47,9 @@ for component in manifest['components']:
     for item in component.get('additionalInputs', []):
         source(item['archive'], item['sha256'])
     directory = Path(component['archive']).parent
-    source(str(directory / (component['name'] + '.rb')), component['recipeSHA256'])
+    source(str(directory / component.get('recipeFile', component['name'] + '.rb')), component['recipeSHA256'])
+    for metadata in component.get('metadataFiles', []):
+        source(metadata['archive'], metadata['sha256'])
 include(root / 'sources.json', 'components/sources.json')
 firmware = args.firmware.resolve()
 firmware_manifest = json.loads((firmware / 'seabios-build.json').read_text())
@@ -58,7 +60,7 @@ for name in ['seabios.config', 'seabios-build.json', 'SEABIOS-COPYING.txt']:
     include(firmware / name, 'firmware/' + name)
 for relative in ['LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md',
                  'Configuration/EngineSourceInputs.json', 'Configuration/ThirdParty/Homebrew-LICENSE.txt',
-                 'scripts/build-win9x-bios.py', 'scripts/build-guest-agent.py', 'scripts/bundle-qemu.py',
+                 'scripts/build-store-qemu.py', 'scripts/build-win9x-bios.py', 'scripts/build-guest-agent.py', 'scripts/bundle-qemu.py',
                  'scripts/collect-engine-sources.py', 'scripts/collect-source-notices.py',
                  'scripts/package-engine-sources.py', 'scripts/build-store-candidate.sh',
                  'GuestTools/Agent/agent.c', 'GuestTools/Agent/win32.h', 'GuestTools/Agent/LICENSE',

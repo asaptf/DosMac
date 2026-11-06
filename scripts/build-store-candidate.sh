@@ -9,16 +9,23 @@ fi
 : "${DOSMAC_TEAM_ID:?Set DOSMAC_TEAM_ID to your Apple Developer team}"
 : "${DOSMAC_SIGN_IDENTITY:?Set DOSMAC_SIGN_IDENTITY to your Apple Development identity}"
 : "${DOSMAC_SOURCE_DIR:?Set DOSMAC_SOURCE_DIR to your verified engine source directory}"
+: "${DOSMAC_QEMU_PATH:?Set DOSMAC_QEMU_PATH to your project-built minimal qemu-system-i386}"
+: "${DOSMAC_QEMU_BUILD_MANIFEST:?Set DOSMAC_QEMU_BUILD_MANIFEST to its source-build.json}"
+dosmac_build_number="${DOSMAC_BUILD_NUMBER:-1}"
+if [[ ! "$dosmac_build_number" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DOSMAC_BUILD_NUMBER must be a positive integer.\n' >&2
+  exit 2
+fi
 candidate="$(pwd)/build/store-candidates/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 mkdir -p "$candidate"
 xcodegen generate
 xcodebuild -project DosMac.xcodeproj -scheme DosMac-AppStore \
   -configuration Release -destination 'generic/platform=macOS' \
   -archivePath "$candidate/DosMac.xcarchive" -allowProvisioningUpdates \
-  "DEVELOPMENT_TEAM=$DOSMAC_TEAM_ID" CODE_SIGN_STYLE=Automatic archive \
+  "DEVELOPMENT_TEAM=$DOSMAC_TEAM_ID" "CURRENT_PROJECT_VERSION=$dosmac_build_number" CODE_SIGN_STYLE=Automatic archive \
   > "$candidate/archive.log" 2>&1
 application="$candidate/DosMac.xcarchive/Products/Applications/DosMac.app"
-python3 scripts/bundle-qemu.py --app "$application" --sandbox \
+python3 scripts/bundle-qemu.py --app "$application" --sandbox --qemu "$DOSMAC_QEMU_PATH" --qemu-build "$DOSMAC_QEMU_BUILD_MANIFEST" \
   --sign-identity "$DOSMAC_SIGN_IDENTITY" --sources "$DOSMAC_SOURCE_DIR" \
   > "$candidate/bundle.log" 2>&1
 python3 scripts/verify-store-bundle.py --app "$application" > "$candidate/boundaries.json"

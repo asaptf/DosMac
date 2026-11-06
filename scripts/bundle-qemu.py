@@ -24,6 +24,7 @@ def dependencies(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", required=True, type=Path)
+    parser.add_argument("--qemu-build", type=Path, help="Source-build manifest for the project-built minimal QEMU")
     parser.add_argument("--sources", type=Path, help="Verified source evidence directory; include source license texts before signing")
     parser.add_argument("--sandbox", action="store_true", help="Sign embedded executable helpers for sandbox inheritance")
     parser.add_argument("--sign-identity", default="-", help="Code-signing identity; ad-hoc by default for local checks")
@@ -42,6 +43,14 @@ def main():
     if not (app / "Contents" / "Info.plist").exists():
         parser.error("Build the macOS application before bundling its engine.")
     prefix = args.qemu.parent.parent
+    source_build = json.loads(args.qemu_build.read_text()) if args.qemu_build else None
+    build_script = Path(__file__).resolve().parent / "build-store-qemu.py"
+    if source_build:
+        if source_build.get("format") != "dosmac-qemu-source-build-v1" or source_build.get("buildScript") != build_script.name or source_build.get("buildScriptSHA256") != hashlib.sha256(build_script.read_bytes()).hexdigest():
+            raise RuntimeError("QEMU source-build provenance does not match its build script")
+        for name in ["bin/qemu-system-i386", "bin/qemu-img"]:
+            if hashlib.sha256((prefix / name).read_bytes()).hexdigest() != source_build.get("files", {}).get(name):
+                raise RuntimeError("The supplied QEMU binary does not match its source-build manifest")
     destination = app / "Contents/Resources/QEMU"
     previous = destination / "build-manifest.json"
     if previous.is_file():
@@ -129,6 +138,19 @@ def main():
     components = {}
     for original, target in copied.items():
         parts = original.parts
+        if source_build and original.is_relative_to(prefix.resolve()):
+            name = str(original.relative_to(prefix.resolve()))
+            if name not in source_build["files"]:
+                raise RuntimeError("Untracked native file in custom QEMU prefix")
+            key = source_build["name"] + "@" + source_build["version"]
+            item = components.setdefault(key, {"name": source_build["name"], "version": source_build["version"], "files": [],
+                                              "recipeSHA256": source_build["buildScriptSHA256"], "recipeFile": build_script.name, "sourceBuild": source_build})
+            item["files"].append(str(target.relative_to(app)))
+            license_dir = destination / "Licenses" / key
+            license_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(build_script, license_dir / build_script.name)
+            shutil.copy2(args.qemu_build, license_dir / "source-build.json")
+            continue
         if "Cellar" not in parts:
             continue
         index = parts.index("Cellar")
@@ -160,6 +182,11 @@ def main():
     if args.sources:
         if sum(len(c["files"]) for c in components.values()) != len(copied):
             raise RuntimeError("Some native binaries lack source provenance. Supply reviewed source metadata for custom engines before assembling a candidate.")
+        evidence = json.loads((args.sources / "sources.json").read_text())
+        expected_sources = {(c["name"], c["version"], c["recipeSHA256"]) for c in components.values()}
+        supplied_sources = {(c["name"], c["version"], c["recipeSHA256"]) for c in evidence["components"]}
+        if expected_sources != supplied_sources:
+            raise RuntimeError("Source evidence does not match the bundled component versions and build recipes")
         subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "collect-source-notices.py"), "--sources", str(args.sources), "--app", str(app)], check=True)
         shutil.copy2(args.sources / "sources.json", destination / "source-evidence.json")
     manifest = {"version": version, "purpose": "sandboxed store preparation" if args.sandbox else "local developer build", "upstream": "https://www.qemu.org/", "nativeFiles": [str(p.relative_to(app)) for p in copied.values()], "assemblyNativeSHA256": {str(p.relative_to(app)): hashlib.sha256(p.read_bytes()).hexdigest() for p in copied.values()}, "files": {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in destination.rglob("*") if p.is_file()}}

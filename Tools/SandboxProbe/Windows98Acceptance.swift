@@ -75,23 +75,21 @@ import DosMacVM
         try await session.tap("ret")
         try await Task.sleep(for: .seconds(1))
         if CommandLine.arguments.contains("--check-floppy-swap") {
-            log("Checking a second support floppy after an explicit eject…")
-            try await session.eject(cdrom: false)
-            try await Task.sleep(for: .seconds(1))
+            log("Checking the production support-floppy replacement path…")
             let marker = Data("Original DosMac second-floppy acceptance marker.\r\n".utf8)
             try await session.mountSupportDisk(files: ["SECOND.TXT": marker])
             let script = "@ECHO OFF\r\nCOPY /B A:\\SECOND.TXT H:\\DMTOOLS\\SECOND.OUT\r\nPAUSE >NUL\r\nEXIT\r\n"
-            try Data(script.utf8).write(to: shared.appendingPathComponent("SHARE.BAT"))
-            try await run("C:\\COMMAND.COM /C H:\\DMTOOLS\\SHARE.BAT", session: session)
+            try Data(script.utf8).write(to: shared.appendingPathComponent("FLOPPY.BAT"))
+            try await run("C:\\COMMAND.COM /C H:\\DMTOOLS\\FLOPPY.BAT", session: session)
             let deadline = Date().addingTimeInterval(20)
             var copied = false
             while Date() < deadline {
                 if (try? Data(contentsOf: shared.appendingPathComponent("SECOND.OUT"))) == marker { copied = true; break }
                 try await Task.sleep(for: .milliseconds(500))
             }
-            guard copied else { throw VMError.invalid("The second support floppy was not readable after explicit eject") }
+            guard copied else { throw VMError.invalid("The replacement support floppy was not readable") }
             try await session.tap("ret")
-            log("The second support floppy was readable after explicit eject.")
+            log("The replacement support floppy was readable.")
         }
         var shutdown = false
         for _ in 0..<3 {
@@ -125,7 +123,8 @@ import DosMacVM
         guard session.absolutePointer, session.guestDisplay?.ready == true else { throw VMError.invalid("Guest Tools did not reconnect after sandboxed cold boot") }
         await session.powerOff()
         return ["windows98GuestToolsConfirmed":true, "windows98ResizeConfirmed":true,
-                "guestFileRoundTripBytes":data.count, "windows98ColdBootConfirmed":true]
+                "guestFileRoundTripBytes":data.count, "windows98ColdBootConfirmed":true,
+                "supportFloppySwapConfirmed":CommandLine.arguments.contains("--check-floppy-swap")]
     }
     private static func log(_ message: String) { FileHandle.standardError.write(Data((message + "\n").utf8)) }
     private static func run(_ command: String, session: MachineSession) async throws {
@@ -144,11 +143,12 @@ import DosMacVM
         try await session.typeText(command.lowercased(), paced:true)
         try await Task.sleep(for: .milliseconds(500))
         try await session.tap("end")
+        let tail = String(command.split(separator: "\\").last ?? "").lowercased().filter { $0.isLetter }
         let verifyDeadline = Date().addingTimeInterval(5)
         var verified = false
         while Date() < verifyDeadline {
             let screen = try await session.observeScreenText().lowercased().filter { $0.isLetter }
-            if screen.contains("typethenameofaprogram"), screen.contains("sharebat") { verified = true; break }
+            if screen.contains("typethenameofaprogram"), screen.contains(tail) { verified = true; break }
             try await Task.sleep(for: .milliseconds(300))
         }
         guard verified else { throw VMError.invalid("The file-copy command was not entered completely") }

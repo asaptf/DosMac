@@ -4,7 +4,7 @@ Status: active work, not a submission-ready release. Updated November 6, 2026.
 
 ## Editions
 
-`DosMac-macOS` remains the developer edition. `DosMac-AppStore` is a separate, sandboxed preparation target, currently Apple Silicon only, with bundle identifier `org.dosmac.store`. Its private container does not migrate or alter the existing developer library. The final App ID and store metadata must be checked in the owner's account before submission.
+`DosMac-macOS` remains the developer edition. `DosMac-AppStore` is a separate, sandboxed preparation target, currently Apple Silicon and macOS 27+ only, with bundle identifier `org.dosmac.store`. Its private container does not migrate or alter the existing developer library. The final App ID and store metadata must be checked in the owner's account before submission.
 
 The preparation target imports user-supplied images and includes an original PC hardware diagnostic. Discover has no unreviewed archive catalog. Local Windows 95/98 media can enter the existing guided installer. Native engine downloads and external engine overrides are rejected in the backends, not merely hidden in the UI. Classic DOSBox-X packages remain in the developer edition. Host disk mounting is developer-only; the store preparation target uses its live folder and exchange images for host transfers.
 
@@ -25,13 +25,13 @@ The exact later repeat results and release validation must accompany the candida
 | --- | --- |
 | Developer and store UI builds and original-fixture regressions | Developer, store, and iOS UI builds passed; 28 VM and 38 Core tests passed. Final packaged acceptance remains open |
 | Original diagnostic color pattern and saved Library shortcut | Visually passed in the signed self-contained store target: text → color pattern → text, saved Library entry, keyboard capture/release and power-off |
-| User-selected file imports/exports inside sandbox | End-to-end panel tests pending |
-| Windows 98 startup, Guest Tools, live file exchange inside sandbox | Startup, mouse integration and actual 800 × 600 mode passed on a private fixture. 3 MiB host → guest C: → host round trip matched byte for byte, followed by normal shutdown and cold boot with Guest Tools reconnection. Repeated support-floppy insertion remains a separate open issue |
+| User-selected file imports/exports inside sandbox | Passed actual SwiftUI/system panels: original file → exchange floppy → selected outside folder (50 bytes matched), and original ISO import |
+| Windows 98 startup, Guest Tools, live file exchange inside sandbox | Startup, mouse integration and actual 800 × 600 mode passed on a private fixture. 3 MiB host → guest C: → host round trip matched byte for byte, followed by normal shutdown and cold boot with Guest Tools reconnection. Repeated support-floppy insertion also passed after fixing the physical drive type and the replacement path |
 | Windows 95 full desktop acceptance | Pending |
-| Complete native dependency license and source inventory | 32 primary archives and 6 additional recipe inputs verified; GLib local patch pinned against the installed recipe. 222 source notice texts collected. Complete-source and store-term review remain open |
+| Complete native dependency license and source inventory | The generic prototype used 32 primary archives and 6 additional recipe inputs verified; GLib local patch pinned against the installed recipe. Source notice collection now includes SPDX-named files under LICENSES directories (257 texts in the current probe). Complete-source and store-term review remain open |
 | Distribution of GPL and other dependencies under store terms | Requires review for the exact binary and distribution terms; Apache-2.0 does not remove upstream obligations |
 | Required-reason API audit of native dependencies | Native symbol inventory and four categories declared with [purpose notes](app-store/privacy-api-review.md); exact exported-app and call-site review pending |
-| About/open-source notices accessible in the app | Visually verified the Settings license list and expanded Apache-2.0 text in the signed app |
+| About/open-source notices accessible in the app | Visually verified project and native notices, including an expanded SPDX-named LGPL text and Homebrew attribution |
 | Final icon, store-sized screenshots, preview video and metadata | In progress |
 | Release archive, App Store provisioning and upload validation | Self-contained Release archive exported successfully after owner login. The extracted 37 MB store package has an Apple Distribution signature, matching embedded profile and installer signature; nested boundaries and helper entitlements passed after export. Server upload/validation and TestFlight remain pending |
 | TestFlight, real clean-Mac acceptance, reviewer demonstration | Pending |
@@ -79,3 +79,15 @@ Native placement follows [Apple TN2206](https://developer.apple.com/library/arch
 English [listing](app-store/listing-en.md) and [review notes](app-store/review-notes-en.md) are drafts for the eventual submitted build.
 
 Source-package assembly and its remaining review boundaries are documented in [Engine source delivery](app-store/source-delivery.md).
+
+## Native candidate refinement
+
+The first exported prototype exposed two additional checks. Its Homebrew native binaries require macOS 26–27 even though the original app target declared macOS 14. The store preparation target now declares macOS 27; supporting macOS 14 requires rebuilding its complete native dependency graph for that target, not changing the Info.plist alone.
+
+The generic Homebrew QEMU also links an unused SSH backend and its crypto dependencies. `build-store-qemu.py` builds a pinned, project-specific i386 engine without SSH, TLS, curl or external UI backends. The source-build manifest records the upstream archive, configuration, build-only adjustment, script hash and binary hashes. The minimal engine passed signed sandbox diagnostics, Windows 98 Guest Tools/resolution, the 3 MiB guest-C: round trip, replacement support floppy, and normal shutdown/cold boot. A new exported candidate and UI panel checks remain in progress. The previously exported prototype is not the final distribution package.
+
+The [first public source snapshot](https://github.com/asaptf/DosMac/releases/tag/store-source-snapshot-2026-11-06) corresponds to the generic prototype inventory. The final minimal candidate needs its own matching source evidence and validation.
+
+The minimal probe currently contains 21 native source components and 107 executable/library files, with 214 source notice texts. Its boundary check also verifies the declared macOS minimum and the QEMU dependency graph.
+
+The project-built minimal engine also passed the existing DOS → Windows 3.1 → Word 6 save/export workflow on a private stopped-reference copy. That regression ran through the developer test host; the signed-container Windows 98 and file-panel results are separate acceptance evidence.

@@ -107,10 +107,10 @@ public final class MachineSession {
     }
 
     public func insert(_ media: MachineMedia, cdrom: Bool) async throws {
-        guard let qmp, let machine, let directory else { throw VMError.notRunning }
+        guard qmp != nil, let machine, let directory else { throw VMError.notRunning }
         let approved = cdrom ? machine.cdroms : machine.floppies
         guard approved.contains(media) else { throw VMError.invalid("This image does not belong to the active machine.") }
-        _ = try await qmp.execute("blockdev-change-medium", arguments: ["device": .string(cdrom ? "cdrom0" : "floppy0"), "filename": .string(directory.appendingPathComponent(media.relativePath).path), "format": .string("raw"), "read-only-mode": .string(cdrom ? "read-only" : "retain"), "force": .bool(true)])
+        try await changeMedium(device: cdrom ? "cdrom0" : "floppy0", file: directory.appendingPathComponent(media.relativePath), readOnly: cdrom)
         if cdrom { currentCD = media.id } else { currentFloppy = media.id }
     }
 
@@ -181,12 +181,23 @@ public final class MachineSession {
         }
     }
     public func mountSupportDisk(files: [String: Data]) async throws {
-        guard let qmp, let runtime else { throw VMError.notRunning }
+        guard qmp != nil, let runtime else { throw VMError.notRunning }
         // Keep the previous image intact until QEMU has switched media.
         let file = runtime.appendingPathComponent("support-\(UUID().uuidString).img")
         try FAT12Disk.make(files: files).write(to: file, options: .atomic)
-        _ = try await qmp.execute("blockdev-change-medium", arguments: ["device": .string("floppy0"), "filename": .string(file.path), "format": .string("raw"), "force": .bool(true)])
+        try await changeMedium(device: "floppy0", file: file, readOnly: false)
         currentFloppy = nil
+    }
+    private func changeMedium(device: String, file: URL, readOnly: Bool) async throws {
+        guard let qmp else { throw VMError.notRunning }
+        let blocks = try await qmp.execute("query-block")
+        if blocks.array?.contains(where: { $0["device"]?.string == device && $0["inserted"] != nil }) == true {
+            // Give legacy removable-media drivers an observable empty-drive
+            // interval instead of replacing two images in a single operation.
+            _ = try await qmp.execute("eject", arguments: ["device": .string(device), "force": .bool(true)])
+            try await Task.sleep(for: .seconds(1))
+        }
+        _ = try await qmp.execute("blockdev-change-medium", arguments: ["device": .string(device), "filename": .string(file.path), "format": .string("raw"), "read-only-mode": .string(readOnly ? "read-only" : "retain"), "force": .bool(true)])
     }
     public func queryBlock() async throws -> JSONValue { guard let qmp else { throw VMError.notRunning }; return try await qmp.execute("query-block") }
     public func isAtDOSPrompt() async throws -> Bool {

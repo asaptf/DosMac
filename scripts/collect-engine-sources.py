@@ -27,23 +27,45 @@ def collect(component):
     key = component['name'] + '@' + component['version']
     result = {'name': component['name'], 'version': component['version'], 'completeCorrespondingSourceReviewed': False}
     try:
-        recipe = engine / 'Licenses' / key / (component['name'] + '.rb')
+        native = engine / 'Licenses' / key
+        recipe_name = component.get('recipeFile', component['name'] + '.rb')
+        if Path(recipe_name).name != recipe_name:
+            raise ValueError('Unsafe build recipe name')
+        recipe = native / recipe_name
+        if hashlib.sha256(recipe.read_bytes()).hexdigest() != component['recipeSHA256']:
+            raise ValueError('Build recipe identity mismatch')
         text = recipe.read_text()
-        # Only the primary stable source at class scope; do not mistake livecheck,
-        # platform branches, resources or test fixtures for the main source.
-        url = re.search(r'^  url "([^"]+)"', text, re.M)
-        digest = re.search(r'^  sha256 "([0-9a-f]{64})"', text, re.M)
-        if not url or not digest:
-            raise ValueError('Primary source cannot be resolved without recipe review')
-        address, expected = url.group(1), digest.group(1)
+        build = component.get('sourceBuild')
+        if build:
+            address, expected = build['sourceURL'], build['sourceSHA256']
+            text = ''  # Source-build inputs are described by the signed manifest.
+        else:
+            # Class-scope primary source, excluding resources and platform branches.
+            url = re.search(r'^  url "([^\"]+)"', text, re.M)
+            digest = re.search(r'^  sha256 "([0-9a-f]{64})"', text, re.M)
+            if not url or not digest:
+                raise ValueError('Primary source cannot be resolved without recipe review')
+            address, expected = url.group(1), digest.group(1)
         if urlsplit(address).scheme != 'https' or '#{' in address:
             raise ValueError('Primary URL needs manual resolution')
         folder = args.output / key
         folder.mkdir(exist_ok=True)
         shutil.copy2(recipe, folder / recipe.name)
+        result['recipeFile'] = recipe.name
+        if build:
+            metadata = native / 'source-build.json'
+            shutil.copy2(metadata, folder / metadata.name)
+            result['metadataFiles'] = [{'archive': str((folder / metadata.name).relative_to(args.output)), 'sha256': hashlib.sha256(metadata.read_bytes()).hexdigest()}]
+            result['sourceBuild'] = build
         source = folder / 'source.archive'
         result.update({'sourceURL': address, 'sha256': expected, 'recipeSHA256': hashlib.sha256(recipe.read_bytes()).hexdigest(),
                        'additionalRecipeInputsNeedReview': bool(re.search(r'^\s*(resource\s|patch\s)', text, re.M))})
+        if not source.is_file():
+            # A new custom-build version can reuse a previously verified archive.
+            for cached in args.output.glob('*/source.archive'):
+                if cached != source and hashlib.sha256(cached.read_bytes()).hexdigest() == expected:
+                    shutil.copy2(cached, source)
+                    break
         if not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != expected:
             partial = folder / 'source.partial'
             try:
