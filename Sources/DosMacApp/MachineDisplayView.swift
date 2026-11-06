@@ -49,6 +49,7 @@ struct MachineDisplayView: NSViewRepresentable {
     let image: CGImage?
     let session: MachineSession
     let inputEnabled: Bool
+    let absolutePointer: Bool
     let onCapture: (Bool) -> Void
 
     func makeNSView(context: Context) -> GuestDisplayView {
@@ -57,6 +58,7 @@ struct MachineDisplayView: NSViewRepresentable {
     }
     func updateNSView(_ view: GuestDisplayView, context: Context) {
         view.inputEnabled = inputEnabled
+        if view.absolutePointer != absolutePointer { view.releaseCapture(); view.absolutePointer = absolutePointer }
         if !inputEnabled { view.releaseCapture() }
         view.frameImage = image; view.needsDisplay = true
     }
@@ -69,6 +71,10 @@ final class GuestDisplayView: NSView {
     weak var session: MachineSession?
     var onCapture: ((Bool) -> Void)?
     var inputEnabled = true
+    var absolutePointer = false
+    private var seamlessCursorHidden = false
+    private var absoluteEvents: [(Int, Int, String?, Bool)] = []
+    private var absoluteInputTask: Task<Void, Never>?
     private var captured = false
     private var tracking: NSTrackingArea?
     private var keys = Set<UInt16>()
@@ -98,7 +104,7 @@ final class GuestDisplayView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(area); tracking = area
     }
 
@@ -113,12 +119,24 @@ final class GuestDisplayView: NSView {
     override func mouseDown(with event: NSEvent) {
         guard inputEnabled else { return }
         window?.makeFirstResponder(self)
+        if absolutePointer { absolute(event, button: "left", down: true); return }
         if !captured { captured = true; NSCursor.hide(); CGAssociateMouseAndMouseCursorPosition(boolean_t(0)); onCapture?(true); return }
         button("left", down: true)
     }
-    override func mouseUp(with event: NSEvent) { if buttons.contains("left") { button("left", down: false) } }
-    override func rightMouseDown(with event: NSEvent) { if captured { button("right", down: true) } }
-    override func rightMouseUp(with event: NSEvent) { if buttons.contains("right") { button("right", down: false) } }
+    override func mouseUp(with event: NSEvent) {
+        if absolutePointer { absolute(event, button: "left", down: false) }
+        else if buttons.contains("left") { button("left", down: false) }
+    }
+    override func rightMouseDown(with event: NSEvent) {
+        if absolutePointer { window?.makeFirstResponder(self); absolute(event, button: "right", down: true) }
+        else if captured { button("right", down: true) }
+    }
+    override func rightMouseUp(with event: NSEvent) {
+        if absolutePointer { absolute(event, button: "right", down: false) }
+        else if buttons.contains("right") { button("right", down: false) }
+    }
+    override func mouseEntered(with event: NSEvent) { if absolutePointer { absolute(event) } }
+    override func mouseExited(with event: NSEvent) { if absolutePointer { releaseAbsoluteButtons(); showHostCursor() } }
     override func mouseMoved(with event: NSEvent) { move(event) }
     override func mouseDragged(with event: NSEvent) { move(event) }
     override func rightMouseDragged(with event: NSEvent) { move(event) }
@@ -128,9 +146,46 @@ final class GuestDisplayView: NSView {
         Task { try? await session?.pointer(dx: 0, dy: 0, button: name, down: down) }
     }
     private func move(_ event: NSEvent) {
+        guard inputEnabled else { return }
+        if absolutePointer { absolute(event); return }
         guard captured else { return }
         let dx = Int(event.deltaX.rounded()), dy = Int(event.deltaY.rounded())
         Task { try? await session?.pointer(dx: dx, dy: dy) }
+    }
+    private func showHostCursor() {
+        if seamlessCursorHidden { seamlessCursorHidden = false; NSCursor.unhide() }
+    }
+    private func releaseAbsoluteButtons() {
+        // A drag leaving the guest must never leave a button pressed inside Windows.
+        let released = buttons; buttons.removeAll()
+        for name in released { enqueueAbsolute(absoluteEvents.last?.0 ?? lastAbsolute.0, absoluteEvents.last?.1 ?? lastAbsolute.1, name, false) }
+    }
+    private var lastAbsolute = (0, 0)
+    private func absolute(_ event: NSEvent, button: String? = nil, down: Bool = false) {
+        guard inputEnabled, let image = frameImage else { return }
+        let scale = min(bounds.width / CGFloat(image.width), bounds.height / CGFloat(image.height))
+        let rect = NSRect(x: (bounds.width - CGFloat(image.width) * scale) / 2, y: (bounds.height - CGFloat(image.height) * scale) / 2, width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
+        let point = convert(event.locationInWindow, from: nil)
+        guard rect.contains(point) else { releaseAbsoluteButtons(); showHostCursor(); return }
+        if !seamlessCursorHidden, window?.isKeyWindow == true { NSCursor.hide(); seamlessCursorHidden = true }
+        let x = GuestPointer.coordinate(Double(point.x - rect.minX), extent: Double(rect.width))
+        let y = GuestPointer.coordinate(Double(rect.maxY - point.y), extent: Double(rect.height))
+        if let button { if down { buttons.insert(button) } else { buttons.remove(button) } }
+        lastAbsolute = (x, y); enqueueAbsolute(x, y, button, down)
+    }
+    private func enqueueAbsolute(_ x: Int, _ y: Int, _ button: String?, _ down: Bool) {
+        // Coalesce movement while keeping every button transition in order.
+        if button == nil, absoluteEvents.last?.2 == nil, !absoluteEvents.isEmpty { absoluteEvents.removeLast() }
+        absoluteEvents.append((x, y, button, down))
+        guard absoluteInputTask == nil else { return }
+        absoluteInputTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.absoluteInputTask = nil }
+            while !self.absoluteEvents.isEmpty {
+                let event = self.absoluteEvents.removeFirst()
+                try? await self.session?.absolutePointer(x: event.0, y: event.1, button: event.2, down: event.3)
+            }
+        }
     }
     override func keyDown(with event: NSEvent) {
         if event.modifierFlags.contains(.command) { super.keyDown(with: event); return }
@@ -153,6 +208,8 @@ final class GuestDisplayView: NSView {
     }
 
     func releaseCapture() {
+        showHostCursor()
+        if absolutePointer { releaseAbsoluteButtons() }
         guard captured || !keys.isEmpty || !buttons.isEmpty else { return }
         if captured { captured = false; CGAssociateMouseAndMouseCursorPosition(boolean_t(1)); NSCursor.unhide(); onCapture?(false) }
         let released = keys.compactMap { Self.keycodes[$0] }; keys.removeAll()

@@ -1,6 +1,7 @@
 import SwiftUI
 import DosMacVM
 import UniformTypeIdentifiers
+import CryptoKit
 
 @MainActor
 final class MachineLibraryModel: ObservableObject {
@@ -11,6 +12,7 @@ final class MachineLibraryModel: ObservableObject {
     @Published var busy = false
     @Published var state = MachineState.stopped
     @Published var captured = false
+    @Published var absolutePointer = false
     @Published var operationMessage: String?
     private var installationTask: Task<Void, Never>?
     #if os(macOS)
@@ -37,6 +39,7 @@ final class MachineLibraryModel: ObservableObject {
             if case .failed(let message) = state { self?.error = message }
         }
         session.onDisplayError = { [weak self] in self?.error = $0 }
+        session.onAbsolutePointer = { [weak self] in self?.absolutePointer = $0 }
         session.onFrame = { [weak self] frame in
             guard let provider = CGDataProvider(data: frame.pixels as CFData) else { return }
             self?.image = CGImage(width: frame.width, height: frame.height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: frame.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue).union(.byteOrder32Big), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
@@ -180,6 +183,44 @@ final class MachineLibraryModel: ObservableObject {
         installationTask?.cancel()
         #if os(macOS)
         session.terminate()
+        #endif
+    }
+
+    func installGuestTools() {
+        #if os(macOS)
+        guard let store, let machine = current, !active, !busy, machine.guest.needsCD,
+              machine.installation?.stage == .complete else { return }
+        busy = true
+        installationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.busy = false; self.operationMessage = nil; self.installationTask = nil }
+            do {
+                func asset(_ name: String, hash: String) throws -> Data {
+                    var roots = [Bundle.main.resourceURL?.appendingPathComponent("GuestTools"), Bundle.main.resourceURL?.appendingPathComponent("Resources/GuestTools"), Bundle.main.resourceURL]
+                    #if SWIFT_PACKAGE
+                    roots.insert(Bundle.module.resourceURL?.appendingPathComponent("Resources/GuestTools"), at: 0)
+                    #endif
+                    guard let url = roots.compactMap({ $0?.appendingPathComponent(name) }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) else { throw VMError.invalid("The embedded Guest Tools files are missing from this build.") }
+                    let data = try Data(contentsOf: url)
+                    guard SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == hash else { throw VMError.invalid("Guest Tools integrity verification failed.") }
+                    return data
+                }
+                let files = try GuestToolsMedia.mouseFiles(
+                    driver: asset("qemouse.drv", hash: "049b0cc00ba812c00fcf5c7b68e1676c827a3c7d3551bb248e280d18ce4d46b9"),
+                    inf: asset("qemouse.inf", hash: "00cbdf229e586708081ae35a6840c8ffe99fbd8b8dd21137934bb28f829490f1"))
+                self.operationMessage = "Saving a recovery copy before installing Guest Tools…"
+                let directory = store.directory(for: machine.id)
+                let backup = directory.appendingPathComponent("Backups/GuestTools-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: backup, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                try FileManager.default.copyItem(at: directory.appendingPathComponent("disk.qcow2"), to: backup.appendingPathComponent("disk.qcow2"))
+                var boot = machine; boot.boot = .hardDisk
+                self.image = nil
+                try await self.session.start(boot, directory: directory)
+                try await GuestToolsInstaller(session: self.session).installMouse(files: files) { self.operationMessage = $0 }
+                self.notice = "Guest Tools: seamless mouse is active. Recovery disk: \(backup.path)."
+            } catch is CancellationError { self.notice = "Guest Tools paused. Review Windows before restarting or retrying; the recovery disk is kept." }
+            catch { self.error = error.localizedDescription }
+        }
         #endif
     }
 
@@ -469,9 +510,18 @@ struct MachineLibraryView: View {
                         }
                         #if os(macOS)
                         if model.active {
-                            MachineDisplayView(image: model.image, session: model.session, inputEnabled: !model.busy && model.state != .paused(machine.id)) { model.captured = $0 }
+                            MachineDisplayView(image: model.image, session: model.session, inputEnabled: !model.busy && model.state != .paused(machine.id), absolutePointer: model.absolutePointer) { model.captured = $0 }
                                 .frame(minHeight: 400, idealHeight: 540).background(.black).clipShape(RoundedRectangle(cornerRadius: 10))
-                            Text(model.busy ? "Installation assistant controls the guest. Pause the assistant to take over." : (model.captured ? "Mouse captured · Control + Option releases mouse and keyboard" : "Click the screen to capture the mouse. Keyboard, mouse, and disk changes stay inside DosMac.")).font(.caption).foregroundStyle(.secondary)
+                            Text(model.busy ? "Installation assistant controls the guest. Pause the assistant to take over." : (model.absolutePointer ? "Seamless mouse · Move freely between Windows and Mac" : model.captured ? "Mouse captured · Control + Option releases mouse and keyboard" : "Click the screen to capture the mouse. Keyboard, mouse, and disk changes stay inside DosMac.")).font(.caption).foregroundStyle(.secondary)
+                        }
+                        #endif
+                        #if os(macOS)
+                        if machine.guest.needsCD, machine.installation?.stage == .complete {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Guest Tools").font(.headline)
+                                Text("Seamless mouse for English Windows 95/98 (Windows 95 is experimental). Shut down Windows first; DosMac saves a recovery disk, installs the embedded driver, and restarts Windows.").font(.callout).foregroundStyle(.secondary)
+                                Button("Install Guest Tools") { model.installGuestTools() }.disabled(model.active || model.busy)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                         }
                         #endif
                         Picker("Start from", selection: Binding(get: { model.current?.boot ?? .hardDisk }, set: { device in Task { await model.setBoot(device) } })) {

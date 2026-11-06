@@ -1,0 +1,129 @@
+import Foundation
+import Testing
+@testable import DosMacVM
+
+struct GuestPointerTests {
+    @Test func normalizesIndependentlyOfDisplayScaleAndClampsEdges() {
+        #expect(GuestPointer.coordinate(0, extent: 640) == 0)
+        #expect(GuestPointer.coordinate(640, extent: 640) == 32767)
+        #expect(GuestPointer.coordinate(320, extent: 640) == GuestPointer.coordinate(960, extent: 1920))
+        #expect(GuestPointer.coordinate(-1, extent: 640) == 0)
+        #expect(GuestPointer.coordinate(999, extent: 640) == 32767)
+        #expect(GuestPointer.coordinate(.nan, extent: 640) == 0)
+        #expect(GuestPointer.coordinate(10, extent: 0) == 0)
+    }
+    @Test func followsCurrentGuestDeviceRatherThanMerelyAvailableTablet() {
+        let relative = JSONValue.object(["current": .bool(true), "absolute": .bool(false)])
+        let tablet = JSONValue.object(["current": .bool(false), "absolute": .bool(true)])
+        #expect(!GuestPointer.isAbsolute(.array([relative, tablet])))
+        #expect(GuestPointer.isAbsolute(.array([.object(["current": .bool(true), "absolute": .bool(true)])])))
+        #expect(!GuestPointer.isAbsolute(.null))
+    }
+    #if os(macOS)
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["DOSMAC_TEST_GUEST_TOOLS_DISK"] != nil))
+    @MainActor func installsMouseToolsInPrivateWindowsCopyAndSurvivesColdBoot() async throws {
+        let env = ProcessInfo.processInfo.environment
+        let source = URL(fileURLWithPath: try #require(env["DOSMAC_TEST_GUEST_TOOLS_DISK"]))
+        let assets = URL(fileURLWithPath: try #require(env["DOSMAC_TEST_GUEST_TOOLS_FILES"]))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DosMacToolsTest-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { if env["DOSMAC_TEST_KEEP_TOOLS"] != "1" { try? FileManager.default.removeItem(at: root) } }
+        let store = try MachineStore(root: root.appendingPathComponent("Machines"))
+        var machine = try await store.create(name: "Guest Tools acceptance", guest: .windows98)
+        let directory = store.directory(for: machine.id)
+        let disk = directory.appendingPathComponent("disk.qcow2")
+        try FileManager.default.removeItem(at: disk)
+        try FileManager.default.copyItem(at: source, to: disk)
+        machine.boot = .hardDisk; machine.sharedFolder = true
+        machine.installation = InstallationRecord(recipeID: Windows9xRecipe.id(for: .windows98), stage: .complete)
+        let files = GuestToolsMedia.mouseFiles(driver: try Data(contentsOf: assets.appendingPathComponent("qemouse.drv")), inf: try Data(contentsOf: assets.appendingPathComponent("qemouse.inf")))
+        let session = MachineSession()
+        try await session.start(machine, directory: directory, muted: true)
+        defer { session.terminate() }
+        do {
+            try await GuestToolsInstaller(session: session).installMouse(files: files) { print($0); fflush(nil) }
+            try #require(session.absolutePointer)
+            // Windows must finish booting and shut down normally. Cutting power
+            // during driver startup makes the next boot choose Safe Mode.
+            var shutdownShown = false
+            for _ in 0..<3 {
+                try await session.sendChord(["ctrl", "esc"])
+                try await Task.sleep(for: .milliseconds(750))
+                try await session.tap("u")
+                let shutdownDeadline = Date().addingTimeInterval(5)
+                while Date() < shutdownDeadline {
+                    let text = try await session.observeScreenText().lowercased().filter { $0.isLetter }
+                    if text.contains("shutdownwindows") { shutdownShown = true; break }
+                    try await Task.sleep(for: .milliseconds(500))
+                }
+                if shutdownShown { break }
+            }
+            try #require(shutdownShown)
+            try await session.tap("s"); try await session.tap("ret")
+            let powerDeadline = Date().addingTimeInterval(60)
+            var safeToStop = false
+            while Date() < powerDeadline {
+                if !session.isActive { safeToStop = true; break }
+                let text = try await session.observeScreenText().lowercased().filter { $0.isLetter }
+                if text.contains("safetoturnoff") { safeToStop = true; break }
+                try await Task.sleep(for: .milliseconds(500))
+            }
+            try #require(safeToStop)
+            await session.powerOff()
+            while session.isActive { try await Task.sleep(for: .milliseconds(100)) }
+            try await session.start(machine, directory: directory, muted: true)
+            let deadline = Date().addingTimeInterval(120)
+            while !session.absolutePointer, Date() < deadline { try await Task.sleep(for: .milliseconds(250)) }
+            if !session.absolutePointer {
+                let text = try await session.observeScreenText()
+                if !text.lowercased().contains("password") { print("Cold boot diagnostic: \(text)") }
+            }
+            #expect(session.absolutePointer)
+            await session.powerOff()
+        } catch {
+            print("Guest Tools acceptance stopped in its private copy: \(root.path)")
+            let text = (try? await session.observeScreenText()) ?? "No display"
+            if !text.lowercased().contains("password"), !text.lowercased().contains("product key") { print("Private fixture diagnostic: \(text)") }
+            throw error
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["DOSMAC_TEST_QEMU"] == "1"))
+    @MainActor func realVMPortSwitchesBetweenAbsoluteAndRelativeInput() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DosMacPointer-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try MachineStore(root: root.appendingPathComponent("Machines"))
+        var machine = try await store.create(name: "Pointer protocol fixture", guest: .msdos622)
+        // Original boot code: use the documented VMware I/O ABI, wait for Enter,
+        // then return to relative input. No DOS/Windows or third-party driver executes.
+        var code: [UInt8] = [0xfa, 0x31, 0xc0, 0x8e, 0xd8, 0x8e, 0xd0, 0xbc, 0, 0x7c, 0xfb]
+        func command(_ value: UInt32) {
+            code += [0x66, 0xb8, 0x68, 0x58, 0x4d, 0x56, 0x66, 0xbb]
+            code += (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }
+            code += [0x66, 0xb9, 41, 0, 0, 0, 0x66, 0xba, 0x58, 0x56, 0, 0, 0x66, 0xed]
+        }
+        command(0x45414552); command(0x53424152)
+        code += [0x31, 0xc0, 0xcd, 0x16]
+        command(0x4c455252)
+        code += [0xfb, 0xf4, 0xeb, 0xfd]
+        var image = Data(repeating: 0, count: 1440 * 1024)
+        image.replaceSubrange(0..<code.count, with: code); image[510] = 0x55; image[511] = 0xaa
+        let disk = root.appendingPathComponent("POINTER.IMG"); try image.write(to: disk)
+        machine = try await store.importMedia([disk], into: machine, cdrom: false)
+        let session = MachineSession()
+        try await session.start(machine, directory: store.directory(for: machine.id), muted: true)
+        defer { session.terminate() }
+        let absoluteDeadline = Date().addingTimeInterval(8)
+        while !session.absolutePointer, Date() < absoluteDeadline { try await Task.sleep(for: .milliseconds(100)) }
+        try #require(session.absolutePointer)
+        try await session.absolutePointer(x: 0, y: 32767, button: "left", down: true)
+        try await session.absolutePointer(x: 32767, y: 0, button: "left", down: false)
+        try await session.tap("ret")
+        let relativeDeadline = Date().addingTimeInterval(5)
+        while session.absolutePointer, Date() < relativeDeadline { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(!session.absolutePointer)
+        try await session.pointer(dx: 12, dy: -8)
+        await session.powerOff()
+    }
+    #endif
+}

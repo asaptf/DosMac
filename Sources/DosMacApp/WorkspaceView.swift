@@ -659,14 +659,15 @@ struct WorkspaceView: View {
             MachineDisplayView(
               image: machines.image, session: machines.session,
               inputEnabled: !machines.busy
-                && { if case .paused = machines.state { false } else { true } }()
+                && { if case .paused = machines.state { false } else { true } }(),
+              absolutePointer: machines.absolutePointer
             ) { machines.captured = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity).frame(minHeight: 340).background(
               .black
             ).clipShape(RoundedRectangle(cornerRadius: 12))
             HStack {
               Text(
-                machines.captured
+                machines.absolutePointer ? "Seamless mouse · Move freely between Windows and Mac" : machines.captured
                   ? "Mouse captured · Control + Option releases input"
                   : "Click the screen to use mouse and keyboard")
               Spacer()

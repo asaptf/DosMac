@@ -11,6 +11,9 @@ public final class MachineSession {
     public var onState: (@MainActor (MachineState) -> Void)?
     public var onFrame: (@MainActor (VMFrame) -> Void)?
     public var onDisplayError: (@MainActor (String) -> Void)?
+    public var onAbsolutePointer: (@MainActor (Bool) -> Void)?
+    public private(set) var absolutePointer = false
+    private var pointerMonitor: Task<Void, Never>?
     public private(set) var currentFloppy: UUID?
     public private(set) var currentCD: UUID?
     private var textDisplay = false
@@ -31,6 +34,7 @@ public final class MachineSession {
         guard !isActive, state != .starting else { throw VMError.invalid("Stop the active machine first.") }
         guard let engine = QEMUInstallation.find() else { throw VMError.engineMissing }
         try machine.validate()
+        latestFrame = nil; textDisplay = false
         state = .starting
         do {
             if machine.sharedDisk == true { try await SharedStorage.prepareForGuest(in: directory) }
@@ -75,6 +79,18 @@ public final class MachineSession {
             display = viewer; try await viewer.start()
             _ = try await connection.execute("cont")
             state = .running(machine.id)
+            pointerMonitor = Task { [weak self, connection] in
+                while !Task.isCancelled {
+                    do {
+                        let absolute = GuestPointer.isAbsolute(try await connection.execute("query-mice"))
+                        guard !Task.isCancelled, let self else { return }
+                        if self.absolutePointer != absolute {
+                            self.absolutePointer = absolute; self.onAbsolutePointer?(absolute)
+                        }
+                        try await Task.sleep(for: .milliseconds(500))
+                    } catch { return }
+                }
+            }
         } catch {
             if task.isRunning { task.terminate() }
             let text = (try? String(contentsOf: logURL, encoding: .utf8)) ?? error.localizedDescription
@@ -123,6 +139,16 @@ public final class MachineSession {
         if dy != 0 { events.append(.object(["type": .string("rel"), "data": .object(["axis": .string("y"), "value": .number(Double(dy))])])) }
         if let button { events.append(.object(["type": .string("btn"), "data": .object(["button": .string(button), "down": .bool(down)])])) }
         if !events.isEmpty { _ = try await qmp.execute("input-send-event", arguments: ["events": .array(events)]) }
+    }
+
+    public func absolutePointer(x: Int, y: Int, button: String? = nil, down: Bool = false) async throws {
+        guard let qmp, absolutePointer else { return }
+        var events: [JSONValue] = [
+            .object(["type": .string("abs"), "data": .object(["axis": .string("x"), "value": .number(Double(min(32767, max(0, x))))])]),
+            .object(["type": .string("abs"), "data": .object(["axis": .string("y"), "value": .number(Double(min(32767, max(0, y))))])]),
+        ]
+        if let button { events.append(.object(["type": .string("btn"), "data": .object(["button": .string(button), "down": .bool(down)])])) }
+        _ = try await qmp.execute("input-send-event", arguments: ["events": .array(events)])
     }
 
     public func queryStatus() async throws -> JSONValue { guard let qmp else { throw VMError.notRunning }; return try await qmp.execute("query-status") }
@@ -250,6 +276,8 @@ public final class MachineSession {
         onDisplayError?(message)
     }
     private func cleanup() async {
+        pointerMonitor?.cancel(); pointerMonitor = nil
+        absolutePointer = false; onAbsolutePointer?(false)
         sharing?.stop(); sharing = nil
         if let display { await display.stop() }; self.display = nil
         if let qmp { await qmp.close() }; self.qmp = nil

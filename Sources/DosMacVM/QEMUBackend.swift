@@ -64,7 +64,7 @@ public enum QEMUArguments {
         // JSON arguments preserve commas, spaces, and Unicode in host paths.
         func json(_ value: JSONValue) throws -> String { String(decoding: try JSONEncoder().encode(value), as: UTF8.self) }
         let disk = directory.appendingPathComponent("disk.qcow2").path
-        var args = ["-name", machine.name, "-machine", "pc-i440fx-9.2", "-accel", "tcg,thread=single", "-cpu", machine.guest.cpu, "-m", String(machine.guest.memoryMB), "-L", installation.firmware.path,
+        var args = ["-name", machine.name, "-machine", "pc-i440fx-9.2,vmport=on", "-accel", "tcg,thread=single", "-cpu", machine.guest.cpu, "-m", String(machine.guest.memoryMB), "-L", installation.firmware.path,
                     "-display", "none", "-vnc", "unix:\(runtime.appendingPathComponent("display.sock").path)", "-qmp", "stdio", "-monitor", "none", "-serial", "none", "-parallel", "none", "-vga", "cirrus", "-boot", "order=\(machine.boot.qemuOrder),menu=on", "-rtc", "base=localtime"]
         args += ["-blockdev", try json(.object(["driver": .string("qcow2"), "node-name": .string("system-disk"), "file": .object(["driver": .string("file"), "filename": .string(disk)])])), "-device", "ide-hd,drive=system-disk,bus=ide.0,unit=0"]
         if machine.guest.needsCD, machine.installation?.recipeID == Windows9xRecipe.id(for: machine.guest) {

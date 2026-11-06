@@ -28,6 +28,16 @@ The primary direction is now [managed PC machines](machine-architecture.md). The
 
 Exit: one prepared recipe installs all three products, boots from HDD, launches Word, saves a document, and exports it to macOS. Locally verified on 2026-11-03 against the selected English releases: installation on a blank HDD, cold boot, Word startup, document save, and host export. The clean installation took about six minutes. The final repeat reused privately prepared media after WinWorld returned HTTP 429.
 
+### Guest integration
+
+- [x] One-click Windows 98 mouse installation, restart and cold-boot acceptance.
+- [x] Embedded QEMouse driver, pinned hashes, license and corresponding source.
+- [x] Native absolute pointer with free host/guest crossing and relative-input fallback.
+- [x] Windows 98 visual acceptance: click, double-click, drag and right-click.
+- [ ] Windows 95 and Windows 3.x mouse acceptance.
+- [ ] Adaptive resolution: guest display driver and resize agent.
+- [ ] Guest control, clipboard and file-operation agent over a private host channel.
+
 ### Extend and release
 
 - [ ] PC DOS compatibility and installation recipes.

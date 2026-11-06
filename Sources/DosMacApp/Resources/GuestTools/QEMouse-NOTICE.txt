@@ -1,0 +1,16 @@
+QEMouse v1.03 — https://github.com/qemus/qemouse
+Copyright and license: see QEMouse-LICENSE.txt (GPL-2.0).
+
+Unmodified upstream release driver and INF:
+https://github.com/qemus/qemouse/releases/download/v1.03/qemouse.zip
+qemouse.drv SHA-256: 049b0cc00ba812c00fcf5c7b68e1676c827a3c7d3551bb248e280d18ce4d46b9
+qemouse.inf SHA-256: 00cbdf229e586708081ae35a6840c8ffe99fbd8b8dd21137934bb28f829490f1
+
+The matching source, build instructions and license are included in
+qemouse-source.tar.gz, upstream commit fe592cba242b31a39b5f1f3c061969b813caf01a.
+Source archive SHA-256: 14adb0f3abeec8fb0c4c7d575179d9d61e7de48289beeecb47ec5cf87d6d8fd9
+Build with Open Watcom as described in its readme.md and Makefile.
+
+DosMac's installer and host-side integration are separate components.
+The release binary is supplied by upstream; it is not claimed to be a
+locally reproducible build. No Windows installation files are included.
