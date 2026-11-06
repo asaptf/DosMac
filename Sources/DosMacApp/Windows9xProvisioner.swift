@@ -1,6 +1,7 @@
 import CryptoKit
 import DosMacVM
 import Foundation
+import DosMacPlatform
 
 private final class WindowsMediaProgress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable
 {
@@ -127,6 +128,7 @@ actor Windows9xProvisioner {
       guest: GuestSystem, productKey: String, acceptedLicense: Bool, store: MachineStore,
       progress: @escaping @Sendable (String) async -> Void
     ) async throws -> Machine {
+      guard DistributionPolicy.current.allowsUnreviewedCatalogs else { throw VMError.invalid("Import your own installation media in this edition.") }
       _ = try Windows9xRecipe.answerFile(
         guest: guest, productKey: productKey, acceptedLicense: acceptedLicense)
       let bootDisk = try await media(Self.boot, progress: progress)

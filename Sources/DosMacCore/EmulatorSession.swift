@@ -1,4 +1,5 @@
 import Foundation
+import DosMacPlatform
 
 public enum SessionState: Equatable, Sendable {
     case idle, running(String), exited(Int32), failed(String)
@@ -83,10 +84,13 @@ public final class EmulatorSession {
         #endif
     }
 
-    public static func findEngine(customPath: String? = nil) -> URL? {
+    public static func findEngine(customPath: String? = nil, policy: DistributionPolicy = .current) -> URL? {
         #if os(macOS)
         let bundled = Bundle.main.resourceURL?.appendingPathComponent("Emulator/dosbox-x.app/Contents/MacOS/dosbox-x").path
-        let candidates = [customPath, ProcessInfo.processInfo.environment["DOSMAC_ENGINE_PATH"], bundled, ManagedEngine.cachedExecutable()?.path, "/Applications/dosbox-x.app/Contents/MacOS/dosbox-x", "/Applications/DOSBox-X.app/Contents/MacOS/dosbox-x", "/opt/homebrew/bin/dosbox-x", "/usr/local/bin/dosbox-x"].compactMap { $0 }
+        let overrides = [customPath, ProcessInfo.processInfo.environment["DOSMAC_ENGINE_PATH"]].compactMap { $0 }
+        let embedded = [bundled].compactMap { $0 }
+        let system = [ManagedEngine.cachedExecutable()?.path, "/Applications/dosbox-x.app/Contents/MacOS/dosbox-x", "/Applications/DOSBox-X.app/Contents/MacOS/dosbox-x", "/opt/homebrew/bin/dosbox-x", "/usr/local/bin/dosbox-x"].compactMap { $0 }
+        let candidates = policy.allowsExternalEngines ? overrides + embedded + system : embedded
         return candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }).map { URL(fileURLWithPath: $0) }
         #else
         return nil

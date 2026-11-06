@@ -1,4 +1,5 @@
 import DosMacCore
+import DosMacPlatform
 import DosMacVM
 import SwiftUI
 import UniformTypeIdentifiers
@@ -55,7 +56,7 @@ struct WorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @FocusState private var searchFocus: SearchField?
   private var entries: [LibraryEntry] {
-    LibraryEntry.entries(machines: machines.machines, apps: apps.apps, packages: library.programs)
+    LibraryEntry.entries(machines: machines.machines, apps: apps.apps, packages: DistributionPolicy.current.allowsExternalEngines ? library.programs : [])
   }
   private var visible: [LibraryEntry] {
     entries.filter { entry in
@@ -222,7 +223,7 @@ struct WorkspaceView: View {
         )
         Menu {
           Button("Computer settings") { sheet = .computer(false) }.disabled(machines.current == nil)
-          Button("Classic package settings") { sheet = .classicSettings }
+          if DistributionPolicy.current.allowsExternalEngines { Button("Classic package settings") { sheet = .classicSettings } }
         } label: {
           Label("Settings", systemImage: "slider.horizontal.3").font(.callout).foregroundStyle(
             .secondary)
@@ -271,6 +272,7 @@ struct WorkspaceView: View {
           Menu {
             Button("Add installed app…") { sheet = .shortcut(nil) }.disabled(
               machines.machines.isEmpty)
+            if DistributionPolicy.current.allowsUnreviewedCatalogs {
             Button("Add from a link…") { sheet = .source("") }
             Button("Import .dosmac package…") { importing = true }
             Button("Hello, DOS demo") {
@@ -283,6 +285,7 @@ struct WorkspaceView: View {
                 filter = "All"
                 section = .library
               }
+            }
             }
           } label: {
             Label("Add", systemImage: "plus")
@@ -338,7 +341,7 @@ struct WorkspaceView: View {
           } description: {
             Text(
               entries.isEmpty
-                ? "Discover classic software, or add an app already installed in your computer."
+                ? (DistributionPolicy.current.allowsUnreviewedCatalogs ? "Discover classic software, or add an app already installed in your computer." : "Open Discover to try the PC hardware check or import your own installation images.")
                 : "Search the websites for more software, or try a different name.")
           } actions: {
             Button("Find software") {
@@ -435,7 +438,8 @@ struct WorkspaceView: View {
       }
     }.frame(width: 55, height: 55)
   }
-  private var discoverPage: some View {
+  @ViewBuilder private var discoverPage: some View {
+    if !DistributionPolicy.current.allowsUnreviewedCatalogs { storeDiscoverPage } else {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         pageHeading("Discover", subtitle: "Find your next old favorite.")
@@ -472,7 +476,7 @@ struct WorkspaceView: View {
           Button("Add from a link…") { sheet = .source("") }
         }
         if !catalog.searched {
-          referenceCollection
+          if DistributionPolicy.current.allowsUnreviewedCatalogs { referenceCollection }
           VStack(alignment: .leading, spacing: 15) {
             Text("Windows 95 & 98").font(.title2.bold())
             Text("Create a private desktop with its installation CD, shared disk, and live host folder. Experimental batch setup; use your own Windows product key.")
@@ -529,6 +533,36 @@ struct WorkspaceView: View {
         }.font(.caption)
       }.padding(30).frame(maxWidth: 1100).frame(maxWidth: .infinity)
     }.navigationTitle("Discover")
+    }
+  }
+  private var storeDiscoverPage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        pageHeading("Discover", subtitle: "Your software. Your computer.")
+        VStack(alignment: .leading, spacing: 16) {
+          Label("Try your first PC", systemImage: "desktopcomputer").font(.title2.bold())
+          Text("Boot an original hardware check, test the keyboard, and display a color pattern. No operating system, download, or product key is needed.").foregroundStyle(.secondary)
+          Button("Open PC hardware check") {
+            section = .session
+            Task { await machines.installDiagnostic() }
+          }.buttonStyle(.borderedProminent).foregroundStyle(workspaceBase).disabled(machines.active || machines.busy)
+        }.padding(24).background(workspaceMint.opacity(0.055), in: RoundedRectangle(cornerRadius: 16))
+        VStack(alignment: .leading, spacing: 16) {
+          Label("Bring your own software", systemImage: "opticaldiscdrive").font(.title2.bold())
+          Text("Create a computer and import your DOS or Windows installation images. Each computer has a private hard disk. Software and licenses are supplied by you.").foregroundStyle(.secondary)
+          Button("Create a computer…") { sheet = .computer(true) }.disabled(machines.active || machines.busy)
+          HStack {
+            Button("Install Windows 98 SE from images…") { sheet = .windows9x(.windows98) }
+            Button("Install Windows 95 from images…") { sheet = .windows9x(.windows95) }
+          }.disabled(machines.active || machines.busy)
+          Text("The guided Windows setup uses your local ISO and an English Windows 98 SE OEM startup floppy with CD-ROM support. You enter your own product key in the installer.").font(.caption).foregroundStyle(.secondary)
+        }.padding(24).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
+        HStack {
+          Link("Privacy policy", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/privacy.md")!)
+          Link("Support", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/support.md")!)
+        }.font(.callout)
+      }.padding(30).frame(maxWidth: 1100).frame(maxWidth: .infinity)
+    }.navigationTitle("Discover")
   }
   private var referenceCollection: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -571,18 +605,18 @@ struct WorkspaceView: View {
           Menu("New computer") {
             Button("Install Windows 98 SE…") { sheet = .windows9x(.windows98) }
             Button("Install Windows 95…") { sheet = .windows9x(.windows95) }
-            Button("Install Windows 3.1 + Word 6") { installReference() }
+            if DistributionPolicy.current.allowsUnreviewedCatalogs { Button("Install Windows 3.1 + Word 6") { installReference() } }
             Button("Create a blank computer…") { sheet = .computer(true) }
           }.disabled(machines.active || machines.busy)
         }
-        if machines.machines.isEmpty { referenceCollection }
+        if machines.machines.isEmpty && DistributionPolicy.current.allowsUnreviewedCatalogs { referenceCollection }
         ForEach(machines.machines) { machine in
           HStack(spacing: 18) {
             Image(systemName: "desktopcomputer").font(.system(size: 30)).foregroundStyle(
               workspaceMint)
             VStack(alignment: .leading, spacing: 6) {
               Text(machine.name).font(.headline)
-              Text(machine.guest.title).font(.caption).foregroundStyle(.secondary)
+              Text(machine.systemTitle).font(.caption).foregroundStyle(.secondary)
               if let installation = machine.installation, installation.stage != .complete {
                 Text(installation.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
               }
@@ -606,7 +640,7 @@ struct WorkspaceView: View {
         HStack {
           pageHeading(
             playingTitle.isEmpty ? (machines.current?.name ?? "Your computer") : playingTitle,
-            subtitle: machines.current?.guest.title ?? "Preparing your desktop")
+            subtitle: machines.current?.systemTitle ?? "Preparing your desktop")
           Spacer()
           #if os(macOS)
             if machines.active {
@@ -791,6 +825,7 @@ struct WorkspaceView: View {
   private func launchNative(_ entry: LibraryEntry) async {
     playingMedia = []
     switch entry.target {
+    case .computer: await machines.launch()
     case .word: await machines.launchWindows(word: true)
     case .windows:
       if let machine = machines.current, machine.guest.needsCD { openComputer(machine) }
@@ -964,13 +999,14 @@ private struct WorkspaceFilesView: View {
             Label("Live shared folder · Windows 9x", systemImage: "network").font(.title2.bold())
             Text("Files in this folder are available to both your Mac and the running Windows computer. Only this computer’s Shared folder is exposed.")
               .font(.callout).foregroundStyle(.secondary)
-            Text(verbatim: "\\\\10.0.2.4\\DOSMAC").font(.system(.body, design: .monospaced)).textSelection(.enabled)
+            Text(verbatim: "\\\\DOSHOST\\DOSMAC").font(.system(.body, design: .monospaced)).textSelection(.enabled)
             Button(model.current?.sharedFolder == true ? "Open shared folder in Finder" : "Enable & open shared folder") {
               Task { await model.openSharedFolder() }
             }.disabled(model.busy || (model.active && model.current?.sharedFolder != true))
-            Text("In Windows, use Map Network Drive with this path. Requires the AMD PCnet adapter, TCP/IP, and Client for Microsoft Networks. DOS and Windows 3.1 can use the shared disk below without network drivers.")
+            Text(DistributionPolicy.current.allowsHostDiskMounts ? "Windows configured by DosMac maps this share to H:. Other computers need the AMD PCnet adapter, TCP/IP, Client for Microsoft Networks, and the DOSHOST alias. DOS and Windows 3.1 can use the shared disk below." : "Windows configured by DosMac maps this share to H:. Other computers need compatible network settings and the DOSHOST alias. For DOS and Windows 3.1, use an exchange floppy below.")
               .font(.caption).foregroundStyle(.secondary)
           }.padding(24).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+          if DistributionPolicy.current.allowsHostDiskMounts {
           VStack(alignment: .leading, spacing: 15) {
             Label("Shared disk · D:", systemImage: "externaldrive.fill").font(.title2.bold())
             Text("A 64 MB disk for your documents, folders, and programs. Open it in Finder while the computer is stopped; DosMac ejects it from your Mac before starting DOS or Windows.")
@@ -982,6 +1018,7 @@ private struct WorkspaceFilesView: View {
             Text("Available as D: on a computer with a single C: partition. CD-ROM letters may move. Finish saving on both systems before switching.")
               .font(.caption).foregroundStyle(.secondary)
           }.padding(24).background(workspaceMint.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
+          }
           VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 18) {
               Image(systemName: "arrow.left.arrow.right").font(.largeTitle).foregroundStyle(

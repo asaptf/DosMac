@@ -1,4 +1,5 @@
 import Foundation
+import DosMacPlatform
 import CryptoKit
 
 public enum EngineInstallProgress: Equatable, Sendable {
@@ -75,7 +76,10 @@ public actor ManagedEngine {
         return executable
     }
 
-    public func ensureInstalled(progress: @escaping ProgressHandler) async throws -> URL {
+    public func ensureInstalled(policy: DistributionPolicy = .current, progress: @escaping ProgressHandler) async throws -> URL {
+        guard policy.allowsNativeEngineDownloads else {
+            throw DosMacError.engineInstallation("This edition uses only engines included in the app. Downloading native engines is unavailable.")
+        }
         if let cached = Self.cachedExecutable(root: root) { return cached }
         if let installation { return try await installation.value }
         let root = root

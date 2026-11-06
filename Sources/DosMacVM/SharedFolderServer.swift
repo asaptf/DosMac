@@ -1,19 +1,19 @@
 #if os(macOS)
   import Foundation
+  import DosMacPlatform
   import Darwin
 
   /// App-private Samba instance: only loopback, forwarded into one isolated QEMU network.
   @MainActor
   public final class SharedFolderServer {
-    public nonisolated static let guestPath = "\\\\10.0.2.4\\DOSMAC"
-    public nonisolated static func executable() -> URL? {
-      [
-        ProcessInfo.processInfo.environment["DOSMAC_SMBD_PATH"].map { URL(fileURLWithPath: $0) },
-        Bundle.main.resourceURL?.appendingPathComponent("QEMU/bin/smbd"),
-        URL(fileURLWithPath: "/opt/homebrew/sbin/samba-dot-org-smbd"),
-        URL(fileURLWithPath: "/usr/local/sbin/samba-dot-org-smbd"),
-      ]
-      .compactMap { $0 }.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    public nonisolated static let guestPath = "\\\\DOSHOST\\DOSMAC"
+    public nonisolated static func executable(policy: DistributionPolicy = .current) -> URL? {
+      let bundled = Bundle.main.resourceURL?.appendingPathComponent("QEMU/bin/smbd")
+      let override = [ProcessInfo.processInfo.environment["DOSMAC_SMBD_PATH"].map { URL(fileURLWithPath: $0) }].compactMap { $0 }
+      let standard = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/smbd")
+      let embedded = policy.allowsExternalEngines ? [standard] + [bundled].compactMap { $0 } : [standard]
+      let system = [URL(fileURLWithPath: "/opt/homebrew/sbin/samba-dot-org-smbd"), URL(fileURLWithPath: "/usr/local/sbin/samba-dot-org-smbd")]
+      return (policy.allowsExternalEngines ? override + embedded + system : embedded).first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
     private var process: Process?
     private var log: FileHandle?

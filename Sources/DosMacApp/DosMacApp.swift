@@ -1,4 +1,5 @@
 import SwiftUI
+import DosMacPlatform
 import DosMacCore
 import UniformTypeIdentifiers
 
@@ -26,7 +27,8 @@ struct DosMacApp: App {
         Settings {
             TabView {
                 MachineEngineSettings().tabItem { Text("Computers") }
-                ScrollView { EngineSettings(model: model).padding(24) }.tabItem { Text("Compatibility") }
+                OpenSourceNoticesView().tabItem { Text("Licenses") }
+                if DistributionPolicy.current.allowsExternalEngines { ScrollView { EngineSettings(model: model).padding(24) }.tabItem { Text("Compatibility") } }
             }.frame(width: 580, height: 430)
         }
         #endif

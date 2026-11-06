@@ -1,4 +1,5 @@
 import Foundation
+import DosMacPlatform
 
 /// A partitioned FAT16 disk, understood by DOS 6.x and Windows 3.x/9x without drivers.
 public enum SharedDiskImage {
@@ -149,6 +150,7 @@ public enum SharedDiskImage {
     /// Never force-detach: a host app keeping a file open must prevent guest startup.
     public static func prepareForGuest(in directory: URL) async throws {
       try ensureDisk(in: directory)
+      guard DistributionPolicy.current.allowsHostDiskMounts else { return }
       if let mounted = try await attachment(in: directory) {
         try await ChildProcess.run(
           URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: ["detach", mounted.device])
@@ -156,6 +158,7 @@ public enum SharedDiskImage {
     }
     /// Call only when QEMU has closed this machine's disks.
     public static func mountForHost(in directory: URL) async throws -> URL {
+      guard DistributionPolicy.current.allowsHostDiskMounts else { throw VMError.invalid("Use the live shared folder or exchange floppy in this edition.") }
       try ensureDisk(in: directory)
       if let mounted = try await attachment(in: directory) {
         guard let volume = mounted.volume else {

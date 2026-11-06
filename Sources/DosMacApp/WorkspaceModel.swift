@@ -30,6 +30,7 @@ final class WorkspaceLibraryModel: ObservableObject {
 
 struct LibraryEntry: Identifiable {
   enum Target {
+    case computer(UUID)
     case word(UUID)
     case windows(UUID)
     case guest(GuestApplication)
@@ -52,7 +53,7 @@ struct LibraryEntry: Identifiable {
   }
   var machineID: UUID? {
     switch target {
-    case .word(let id), .windows(let id): id
+    case .word(let id), .windows(let id), .computer(let id): id
     case .guest(let app): app.machineID
     case .classic: nil
     }
@@ -62,6 +63,12 @@ struct LibraryEntry: Identifiable {
   {
     var entries: [LibraryEntry] = []
     for machine in machines {
+      if machine.diagnostic == true {
+        entries.append(Self(id: "computer-\(machine.id)", title: machine.name,
+          summary: "An original keyboard and display check. No operating system required.", context: machine.systemTitle,
+          symbol: "desktopcomputer", kind: "PC DIAGNOSTIC", target: .computer(machine.id)))
+        continue
+      }
       if machine.guest.needsCD {
         if machine.installation?.stage == .complete {
           entries.append(Self(id: "windows-\(machine.id)", title: machine.guest.title,

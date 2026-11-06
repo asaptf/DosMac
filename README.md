@@ -133,6 +133,8 @@ An explicit engine can be selected with `DOSMAC_QEMU_PATH=/absolute/path/to/qemu
 
 The display agent is already embedded. To rebuild it after changing its source, see [GuestTools/Agent](GuestTools/Agent/README.md).
 
+A separate sandboxed `DosMac-AppStore` preparation target is in progress. It imports local media and includes an original PC diagnostic; it does not expose the developer archive catalogs or native engine downloads. It is **not submission-ready**. See [App Store preparation and remaining gates](docs/app-store-readiness.md).
+
 ### iPhone UI preview
 
 ```sh

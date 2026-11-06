@@ -41,7 +41,7 @@ public final class MachineSession {
         do {
             if machine.sharedDisk == true { try await SharedStorage.prepareForGuest(in: directory) }
         } catch { state = .failed(error.localizedDescription); throw error }
-        let runtime = URL(fileURLWithPath: "/tmp/dosmac-\(UUID().uuidString)", isDirectory: true)
+        let runtime = FileManager.default.temporaryDirectory.appendingPathComponent("dm-\(UUID().uuidString.prefix(8))", isDirectory: true)
         do { try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) }
         catch { state = .failed(error.localizedDescription); throw error }
         self.runtime = runtime; self.machine = machine; self.directory = directory

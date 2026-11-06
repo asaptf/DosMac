@@ -1,4 +1,5 @@
 import SwiftUI
+import DosMacPlatform
 import DosMacVM
 import UniformTypeIdentifiers
 import CryptoKit
@@ -65,6 +66,54 @@ final class MachineLibraryModel: ObservableObject {
         #if os(macOS)
         do { let machine = try await store.create(name: name, guest: guest); await refresh(); selected = machine.id }
         catch { self.error = error.localizedDescription }
+        #else
+        error = "The embedded iPhone machine engine is not available yet."
+        #endif
+    }
+    func installDiagnostic() async {
+        guard let store, !active, !busy else { return }
+        #if os(macOS)
+        busy = true
+        defer { busy = false }
+        do {
+            let existing = machines.first { $0.diagnostic == true }
+            var machine: Machine
+            if let existing { machine = existing }
+            else { machine = try await store.create(name: "PC hardware check", guest: .msdos622) }
+            if existing == nil {
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent("diagnostic-\(UUID().uuidString).img")
+                defer { try? FileManager.default.removeItem(at: file) }
+                try DiagnosticBootDisk.make().write(to: file)
+                machine = try await store.importMedia([file], into: machine, cdrom: false)
+                machine.diagnostic = true
+                try await store.save(machine)
+            }
+            await refresh(); selected = machine.id
+            try await session.start(machine, directory: store.directory(for: machine.id))
+        } catch { self.error = error.localizedDescription; await refresh() }
+        #else
+        error = "The embedded iPhone machine engine is not available yet."
+        #endif
+    }
+    func installWindows9xFromMedia(guest: GuestSystem, iso: URL, bootDisk: URL, productKey: String, acceptedLicense: Bool) {
+        #if os(macOS)
+        guard let store, !active, !busy else { return }
+        busy = true; operationMessage = "Importing your installation media…"
+        installationTask = Task { [weak self] in
+            guard let self else { return }
+            let accessed = [iso, bootDisk].filter { $0.startAccessingSecurityScopedResource() }
+            defer {
+                accessed.forEach { $0.stopAccessingSecurityScopedResource() }
+                self.busy = false; self.operationMessage = nil; self.installationTask = nil
+            }
+            do {
+                let machine = try await store.createWindows9x(guest: guest, iso: iso, bootDisk: bootDisk, productKey: productKey, acceptedLicense: acceptedLicense)
+                await self.refresh(); self.selected = machine.id
+                try await self.session.start(machine, directory: store.directory(for: machine.id))
+                await self.runWindows9xAssistant(machine)
+            } catch is CancellationError { await self.refresh() }
+            catch { self.error = error.localizedDescription; await self.refresh() }
+        }
         #else
         error = "The embedded iPhone machine engine is not available yet."
         #endif
@@ -488,14 +537,14 @@ struct MachineLibraryView: View {
             List(selection: $model.selected) {
                 Section("Your machines") {
                     ForEach(model.machines) { machine in
-                        VStack(alignment: .leading, spacing: 4) { Text(machine.name).font(.headline); Text(machine.guest.title).font(.caption).foregroundStyle(.secondary) }.tag(machine.id)
+                        VStack(alignment: .leading, spacing: 4) { Text(machine.name).font(.headline); Text(machine.systemTitle).font(.caption).foregroundStyle(.secondary) }.tag(machine.id)
                     }
                 }
             }.disabled(model.active || model.busy)
                 .navigationTitle("Machines")
                 .toolbar {
                     Menu {
-                        Button("Install DOS 6.22 + Windows 3.1 + Word 6") { model.prepareReferenceStack() }
+                        if DistributionPolicy.current.allowsUnreviewedCatalogs { Button("Install DOS 6.22 + Windows 3.1 + Word 6") { model.prepareReferenceStack() } }
                         Button("Create a blank machine") { creating = true }
                     } label: { Label("New machine", systemImage: "plus") }.disabled(model.active || model.busy)
                 }
@@ -509,7 +558,7 @@ struct MachineLibraryView: View {
                             HStack { ProgressView().controlSize(.small); Text(message); Spacer(); Button("Pause assistant") { model.cancelAssistant() } }
                         }
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) { Text(machine.name).font(.largeTitle.bold()); Text(machine.guest.title + " · \(machine.guest.memoryMB) MiB · \(machine.guest.diskMB) MiB HDD").foregroundStyle(.secondary) }
+                            VStack(alignment: .leading, spacing: 4) { Text(machine.name).font(.largeTitle.bold()); Text(machine.systemTitle + " · \(machine.guest.memoryMB) MiB · \(machine.guest.diskMB) MiB HDD").foregroundStyle(.secondary) }
                             Spacer()
                             if model.active {
                                 #if os(macOS)
@@ -577,7 +626,7 @@ struct MachineLibraryView: View {
                 } description: {
                     Text("Create a machine with its own hard disk, real DOS or Windows, floppy drive, and CD-ROM. The first reference stack is MS-DOS 6.22, Windows 3.1, and Word 6.")
                 } actions: {
-                    Button("Install DOS 6.22 + Windows 3.1 + Word 6") { model.prepareReferenceStack() }.buttonStyle(.borderedProminent).disabled(model.busy)
+                    if DistributionPolicy.current.allowsUnreviewedCatalogs { Button("Install DOS 6.22 + Windows 3.1 + Word 6") { model.prepareReferenceStack() }.buttonStyle(.borderedProminent).disabled(model.busy) }
                     Button("Create a blank machine") { creating = true }.disabled(model.busy)
                     if let message = model.operationMessage { ProgressView(message) }
                 }

@@ -1,4 +1,5 @@
 import Foundation
+import DosMacPlatform
 import DosMacCore
 import DosMacVM
 
@@ -13,6 +14,7 @@ enum ReferenceStackProvisioner {
 
     #if os(macOS)
     @MainActor static func prepare(store: MachineStore, onCreate: (Machine) async -> Void, progress: @escaping (String) -> Void) async throws -> Machine {
+        guard DistributionPolicy.current.allowsUnreviewedCatalogs else { throw VMError.invalid("Import your own installation media in this edition.") }
         var machine = try await store.create(name: "DOS 6.22 · Windows 3.1 · Word 6", guest: .windows31)
         machine.installation = InstallationRecord(recipeID: recipeID, message: "Preparing installation media…")
         try await store.save(machine)

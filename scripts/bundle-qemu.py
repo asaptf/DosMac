@@ -8,6 +8,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -22,6 +23,9 @@ def dependencies(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", required=True, type=Path)
+    parser.add_argument("--sources", type=Path, help="Verified source evidence directory; include source license texts before signing")
+    parser.add_argument("--sandbox", action="store_true", help="Sign embedded executable helpers for sandbox inheritance")
+    parser.add_argument("--sign-identity", default="-", help="Code-signing identity; ad-hoc by default for local checks")
     parser.add_argument("--qemu", default=shutil.which("qemu-system-i386"), type=Path)
     parser.add_argument("--win9x-firmware", default=Path("build/firmware"), type=Path)
     samba = next((p for p in [shutil.which("samba-dot-org-smbd"),
@@ -38,10 +42,20 @@ def main():
         parser.error("Build the macOS application before bundling its engine.")
     prefix = args.qemu.parent.parent
     destination = app / "Contents/Resources/QEMU"
+    previous = destination / "build-manifest.json"
+    if previous.is_file():
+        for relative in json.loads(previous.read_text()).get("nativeFiles", []):
+            file = app / relative
+            if not relative.startswith(("Contents/Helpers/", "Contents/Frameworks/", "Contents/Resources/QEMU/bin/", "Contents/Resources/QEMU/lib/")) or not file.resolve().is_relative_to(app):
+                raise RuntimeError("Unsafe previous native-code inventory")
+            if file.is_file():
+                file.unlink()
     if destination.exists():
         shutil.rmtree(destination)
-    (destination / "bin").mkdir(parents=True)
-    (destination / "lib").mkdir()
+    binaries = app / "Contents/Helpers" if args.sandbox else destination / "bin"
+    libraries = app / "Contents/Frameworks" if args.sandbox else destination / "lib"
+    binaries.mkdir(parents=True, exist_ok=True)
+    libraries.mkdir(parents=True, exist_ok=True)
     (destination / "share/qemu").mkdir(parents=True)
     copied = {}
     names = {}
@@ -74,17 +88,17 @@ def main():
                 continue  # dylib's own install name
             if not source.exists():
                 raise RuntimeError(f"Cannot resolve dependency {dependency} of {original.name}")
-            library = copy_binary(source, destination / "lib" / source.name)
-            relative = "@loader_path/" + library.name if target.parent.name == "lib" else "@executable_path/../lib/" + library.name
+            library = copy_binary(source, libraries / source.name)
+            relative = "@loader_path/" + library.name if target.parent == libraries else ("@executable_path/../Frameworks/" if args.sandbox else "@executable_path/../lib/") + library.name
             subprocess.run(["install_name_tool", "-change", dependency, relative, str(target)], check=True, capture_output=True)
-        if target.parent.name == "lib":
+        if target.parent == libraries:
             subprocess.run(["install_name_tool", "-id", "@rpath/" + target.name, str(target)], check=True, capture_output=True)
         return target
 
     for name in ["qemu-system-i386", "qemu-img"]:
-        copy_binary(prefix / "bin" / name, destination / "bin" / name)
+        copy_binary(prefix / "bin" / name, binaries / name)
     if args.samba:
-        copy_binary(args.samba, destination / "bin/smbd")
+        copy_binary(args.samba, binaries / "smbd")
         shutil.copy2(args.samba.resolve().parent.parent / "COPYING", destination / "SAMBA-COPYING.txt")
     firmware = ["bios-256k.bin", "bios.bin", "vgabios-cirrus.bin", "vgabios-stdvga.bin", "kvmvapic.bin", "efi-pcnet.rom"]
     for name in firmware:
@@ -93,16 +107,70 @@ def main():
         target = destination / "share/qemu" / name if name == "bios-win9x.bin" else destination / name
         shutil.copy2(args.win9x_firmware / name, target)
     shutil.copytree(prefix / "share/qemu/keymaps", destination / "share/qemu/keymaps")
-    for target in sorted(copied.values(), key=lambda p: p.parent.name != "lib"):
+    for target in sorted(copied.values(), key=lambda p: p.parent != libraries):
         for dependency in dependencies(target):
             if dependency.startswith(("/opt/", "/usr/local/")):
                 raise RuntimeError(f"Unbundled dependency remains: {dependency}")
-        subprocess.run(["codesign", "--force", "--sign", "-", str(target)], check=True, capture_output=True)
-    version = command(str(destination / "bin/qemu-system-i386"), "--version").splitlines()[0]
-    manifest = {"version": version, "purpose": "local developer build", "upstream": "https://www.qemu.org/", "files": {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in destination.rglob("*") if p.is_file()}}
+        signing = ["codesign", "--force", "--sign", args.sign_identity]
+        if args.sandbox:
+            signing += ["--options", "runtime"]
+            if target.parent == binaries:
+                entitlement = "QEMUHelper.entitlements" if target.name == "qemu-system-i386" else "InheritedHelper.entitlements"
+                signing += ["--entitlements", str(Path(__file__).resolve().parent.parent / "Configuration" / entitlement)]
+        subprocess.run(signing + [str(target)], check=True, capture_output=True)
+    version = command(str(args.qemu), "--version").splitlines()[0]
+    components = {}
+    for original, target in copied.items():
+        parts = original.parts
+        if "Cellar" not in parts:
+            continue
+        index = parts.index("Cellar")
+        component, installed_version = parts[index + 1:index + 3]
+        key = component + "@" + installed_version
+        keg = Path(*parts[:index + 3])
+        recipe = keg / ".brew" / (component + ".rb")
+        receipt = keg / "INSTALL_RECEIPT.json"
+        item = components.setdefault(key, {"name": component, "version": installed_version, "files": []})
+        item["files"].append(str(target.relative_to(app)))
+        license_dir = destination / "Licenses" / key
+        license_dir.mkdir(parents=True, exist_ok=True)
+        for source_file in [recipe, receipt]:
+            if source_file.is_file():
+                shutil.copy2(source_file, license_dir / source_file.name)
+        # Installed license texts supplement, and do not replace, corresponding source.
+        for license_file in keg.rglob("*"):
+            if license_file.is_file() and not license_file.is_symlink() and license_file.name.upper().startswith(("COPYING", "LICENSE", "LICENCE", "COPYRIGHT", "AUTHORS", "NOTICE")):
+                relative = license_file.relative_to(keg)
+                target_file = license_dir / "installed" / relative
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(license_file, target_file)
+        item["recipeSHA256"] = hashlib.sha256(recipe.read_bytes()).hexdigest() if recipe.is_file() else None
+    shutil.copy2(Path(__file__).resolve().parent.parent / "Configuration/ThirdParty/Homebrew-LICENSE.txt", destination / "Licenses/Homebrew-LICENSE.txt")
+    (destination / "components.json").write_text(json.dumps(sorted(components.values(), key=lambda c: c["name"]), indent=2) + "\n")
+    if args.sources:
+        if sum(len(c["files"]) for c in components.values()) != len(copied):
+            raise RuntimeError("Some native binaries lack source provenance. Supply reviewed source metadata for custom engines before assembling a candidate.")
+        subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "collect-source-notices.py"), "--sources", str(args.sources), "--app", str(app)], check=True)
+        shutil.copy2(args.sources / "sources.json", destination / "source-evidence.json")
+    manifest = {"version": version, "purpose": "local developer build", "upstream": "https://www.qemu.org/", "nativeFiles": [str(p.relative_to(app)) for p in copied.values()], "files": {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in destination.rglob("*") if p.is_file()}}
     (destination / "build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (destination / "DEVELOPER-NOTICE.txt").write_text("Local development bundle only. QEMU, SeaBIOS, VGA BIOS, and linked libraries retain their respective licenses. A redistributable build must include their notices and required corresponding source. This script does not establish distribution compliance or notarization.\n")
-    subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True, capture_output=True)
+    # Xcode Debug can split the app into an executable and a debug dylib.
+    # Keep every remaining Mach-O on the same team before enabling validation.
+    if args.sandbox:
+        magic = {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xce", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca"}
+        already_signed = set(copied.values())
+        for nested in (app / "Contents").rglob("*"):
+            if not nested.is_file() or nested in already_signed:
+                continue
+            with nested.open("rb") as file:
+                if file.read(4) not in magic:
+                    continue
+            subprocess.run(["codesign", "--force", "--sign", args.sign_identity, "--options", "runtime", str(nested)], check=True, capture_output=True)
+    signing = ["codesign", "--force", "--sign", args.sign_identity]
+    if args.sandbox:
+        signing += ["--options", "runtime", "--entitlements", str(Path(__file__).resolve().parent.parent / "Configuration/AppStore.entitlements")]
+    subprocess.run(signing + [str(app)], check=True, capture_output=True)
     print(f"Bundled {version}: {len(copied)} binaries/libraries; no Homebrew dylib paths remain.")
 
 

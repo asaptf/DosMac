@@ -1,4 +1,5 @@
 import Foundation
+import DosMacPlatform
 import CryptoKit
 import SWCompression
 
@@ -32,12 +33,14 @@ public struct PreparedImport: Sendable {
 /// Fetches source metadata and prepares a private, validated local package.
 /// No remote installer can execute native host commands.
 public actor SoftwareSources {
+    private let policy: DistributionPolicy
     private let session: URLSession
     private let fm = FileManager.default
     public static let downloadLimit = 32 * 1024 * 1024
     public static let expandedLimit = 128 * 1024 * 1024
 
-    public init() {
+    public init(policy: DistributionPolicy = .current) {
+        self.policy = policy
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil
         config.urlCredentialStorage = nil
@@ -57,6 +60,7 @@ public actor SoftwareSources {
     }
 
     public func inspect(_ url: URL) async throws -> [RemoteRelease] {
+        guard policy.allowsUnreviewedCatalogs else { throw DosMacError.invalidPackage("This edition imports your own installation images. Archive catalog downloads are unavailable.") }
         try Self.validateURL(url)
         if url.host?.lowercased() == "archive.org", url.pathComponents.count == 3, url.pathComponents[1] == "details" {
             let identifier = url.lastPathComponent
@@ -72,6 +76,7 @@ public actor SoftwareSources {
     }
 
     public func search(_ query: String, source: CatalogSource) async throws -> [CatalogItem] {
+        guard policy.allowsUnreviewedCatalogs else { throw DosMacError.invalidPackage("This edition imports your own installation images. Archive catalog downloads are unavailable.") }
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, query.count <= 160 else { throw DosMacError.invalidPackage("enter a search of up to 160 characters") }
         let page = source.searchURL(query)
@@ -138,6 +143,7 @@ public actor SoftwareSources {
     }
 
     public func prepare(_ release: RemoteRelease) async throws -> PreparedImport {
+        guard policy.allowsUnreviewedCatalogs else { throw DosMacError.invalidPackage("This edition imports your own installation images. Archive catalog downloads are unavailable.") }
         let resolved: RemoteRelease
         if release.downloadURL == nil {
             guard let item = try await inspect(release.pageURL).first, item.downloadURL != nil else { throw DosMacError.invalidPackage("download mirror unavailable") }

@@ -41,3 +41,7 @@ DosMac's macOS adapter invokes [DOSBox-X](https://github.com/joncampbell123/dosb
 ## QEMouse v1.03
 
 The embedded mouse driver is GPL-2.0 licensed. Its exact corresponding source, license and provenance are included in `Sources/DosMacApp/Resources/GuestTools`. See [Guest Tools](docs/guest-tools.md) and the [upstream project](https://github.com/qemus/qemouse). DosMac's display agent is an original, separate MIT-licensed component; its license is in `GuestTools/Agent/LICENSE`.
+
+## Homebrew build recipes
+
+Local source-evidence packages retain the exact installed Homebrew recipes, receipts, and pinned build inputs for the copied native components. Homebrew formula code retains its BSD-2-Clause license; see [the included text](Configuration/ThirdParty/Homebrew-LICENSE.txt). Source archives, recipe inputs, and source notice extraction are checksum-verified. Their collection does not establish compatibility with store terms or replace a complete corresponding-source review for the exact distributed build.

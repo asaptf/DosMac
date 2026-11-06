@@ -38,11 +38,13 @@ Exit: one prepared recipe installs all three products, boots from HDD, launches 
 - [x] Original Windows display agent, confirmed mode switching, and native resolution menu.
 - [x] Windows 98 automatic fitting, normal shutdown and agent cold-boot acceptance.
 - [x] Native Display menu and saved per-computer fitting preference.
-- [ ] Final visual pass of the rebuilt display agent (Mac locked).
+- [x] Final visual pass of the rebuilt display agent, native mouse operations and cold boot.
 - [ ] Replacement virtual display driver and arbitrary widescreen resolutions.
 - [ ] Guest control, clipboard and file-operation agent over a private host channel.
 
 ### Extend and release
+
+App Store preparation is tracked separately in [readiness and evidence](app-store-readiness.md).
 
 - [ ] PC DOS compatibility and installation recipes.
 - [x] Pinned Windows 95/98 CD and boot-floppy media, new-PC provisioning and batch answer files.

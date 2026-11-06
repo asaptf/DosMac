@@ -1,0 +1,14 @@
+{
+  "glib@2.90.1": {
+    "recipeSHA256": "7352a67a6a1a15554d996d38886812e858bebbbcbf3985901724cab444ee3b3b",
+    "provenance": "Pinned Homebrew core recipe matches installed recipe after removal of bottle-only metadata.",
+    "revision": "b9c2d40cfb3fcbc8ca25f91bb689bd27c750c322",
+    "files": [
+      {
+        "relativePath": "Patches/glib/hardcoded-paths.diff",
+        "url": "https://raw.githubusercontent.com/Homebrew/homebrew-core/b9c2d40cfb3fcbc8ca25f91bb689bd27c750c322/Patches/glib/hardcoded-paths.diff",
+        "sha256": "d846efd0bf62918350da94f850db33b0f8727fece9bfaf8164566e3094e80c97"
+      }
+    ]
+  }
+}

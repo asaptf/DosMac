@@ -1,21 +1,28 @@
 #if os(macOS)
 import Foundation
+import DosMacPlatform
 
 public struct QEMUInstallation: Sendable {
     public let executable: URL
     public let imageTool: URL
     public let firmware: URL
 
-    public static func find() -> QEMUInstallation? {
-        let bundled = Bundle.main.resourceURL?.appendingPathComponent("QEMU")
-        let candidates: [URL] = [ProcessInfo.processInfo.environment["DOSMAC_QEMU_PATH"].map { URL(fileURLWithPath: $0) }, bundled?.appendingPathComponent("bin/qemu-system-i386"), URL(fileURLWithPath: "/opt/homebrew/bin/qemu-system-i386"), URL(fileURLWithPath: "/usr/local/bin/qemu-system-i386")].compactMap { $0 }
-        for executable in candidates where FileManager.default.isExecutableFile(atPath: executable.path) {
+    public static func find(policy: DistributionPolicy = .current) -> QEMUInstallation? {
+        func external(_ executable: URL) -> QEMUInstallation {
             let prefix = executable.deletingLastPathComponent().deletingLastPathComponent()
-            let imageTool = prefix.appendingPathComponent("bin/qemu-img")
-            let firmware = prefix.appendingPathComponent("share/qemu")
-            if FileManager.default.isExecutableFile(atPath: imageTool.path), FileManager.default.fileExists(atPath: firmware.appendingPathComponent("bios-256k.bin").path) {
-                return QEMUInstallation(executable: executable, imageTool: imageTool, firmware: firmware)
-            }
+            return QEMUInstallation(executable: executable, imageTool: prefix.appendingPathComponent("bin/qemu-img"), firmware: prefix.appendingPathComponent("share/qemu"))
+        }
+        var embedded: [QEMUInstallation] = []
+        if let resources = Bundle.main.resourceURL {
+            let helpers = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers")
+            embedded.append(QEMUInstallation(executable: helpers.appendingPathComponent("qemu-system-i386"), imageTool: helpers.appendingPathComponent("qemu-img"), firmware: resources.appendingPathComponent("QEMU/share/qemu")))
+            if policy.allowsExternalEngines { embedded.append(external(resources.appendingPathComponent("QEMU/bin/qemu-system-i386"))) }
+        }
+        let overrides = [ProcessInfo.processInfo.environment["DOSMAC_QEMU_PATH"].map { external(URL(fileURLWithPath: $0)) }].compactMap { $0 }
+        let system = [external(URL(fileURLWithPath: "/opt/homebrew/bin/qemu-system-i386")), external(URL(fileURLWithPath: "/usr/local/bin/qemu-system-i386"))]
+        let candidates = policy.allowsExternalEngines ? overrides + embedded + system : embedded
+        for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate.executable.path) {
+            if FileManager.default.isExecutableFile(atPath: candidate.imageTool.path), FileManager.default.fileExists(atPath: candidate.firmware.appendingPathComponent("bios-256k.bin").path) { return candidate }
         }
         return nil
     }
@@ -70,7 +77,7 @@ public enum QEMUArguments {
         if machine.guest.needsCD, machine.installation?.recipeID == Windows9xRecipe.id(for: machine.guest) {
             // DOS's BPB geometry must match SeaBIOS even before Setup installs protected-mode IDE.
             args[args.count - 1] += ",lcyls=520,lheads=64,lsecs=63,bios-chs-trans=lba"
-            let bios = ProcessInfo.processInfo.environment["DOSMAC_WIN9X_BIOS"].map { URL(fileURLWithPath: $0) }
+            let bios = (DistributionPolicy.current.allowsExternalEngines ? ProcessInfo.processInfo.environment["DOSMAC_WIN9X_BIOS"].map { URL(fileURLWithPath: $0) } : nil)
                 ?? installation.firmware.appendingPathComponent("bios-win9x.bin")
             guard FileManager.default.fileExists(atPath: bios.path) else {
                 throw VMError.invalid("This Windows computer needs the embedded Windows 9x firmware. Rebuild DosMac with scripts/build-win9x-bios.py and scripts/bundle-qemu.py.")

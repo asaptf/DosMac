@@ -68,6 +68,8 @@ public struct Machine: Codable, Identifiable, Equatable, Sendable {
     public var sharedDisk: Bool?
     public var automaticDisplay: Bool?
     public var sharedFolder: Bool?
+    public var diagnostic: Bool?
+    public var systemTitle: String { diagnostic == true ? "Original PC diagnostic" : guest.title }
 
     public init(id: UUID = UUID(), name: String, guest: GuestSystem, boot: BootDevice = .floppy, floppies: [MachineMedia] = [], cdroms: [MachineMedia] = []) {
         self.id = id; self.name = name; self.guest = guest; self.boot = boot
