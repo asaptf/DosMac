@@ -1,0 +1,13 @@
+DosMac
+Copyright 2026 DosMac contributors
+
+DosMac's original project code is licensed under the Apache License, Version 2.0.
+
+Separately licensed components and bundled resources retain their own licenses.
+See THIRD_PARTY_NOTICES.md and the notices accompanying those components.
+The standalone display agent in GuestTools/Agent retains its MIT license.
+
+Product names and trademarks belong to their respective owners. Screenshots
+show separately installed guest software and do not imply affiliation or endorsement.
+No commercial operating system, application installation media, or product key
+is included in this repository.

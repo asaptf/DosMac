@@ -1,5 +1,7 @@
 # Third-party notices
 
+DosMac's original project code is licensed under [Apache License 2.0](LICENSE). This does not relicense the components below; their licenses and source obligations remain applicable. See [NOTICE](NOTICE).
+
 ## QEMU machine backend
 
 The new machine manager invokes QEMU as an owned process and implements QMP/RFB protocols in Swift. No QEMU source or OS/application image is vendored in this repository. The local developer bundling script copies a developer-installed QEMU and its runtime dependencies into a local build artifact; this is not a publicly redistributable release package. QEMU, SeaBIOS, VGA BIOS and each linked library retain their own licenses. Before binary distribution, provide the applicable notices and corresponding source and complete signing/notarization. Sources: [QEMU](https://www.qemu.org/), [QEMU licensing](https://www.qemu.org/docs/master/about/license.html), [SeaBIOS](https://www.seabios.org/).
