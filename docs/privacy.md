@@ -18,7 +18,7 @@ Guest operating systems and applications have their own behavior and privacy pra
 
 ## External services
 
-The App Store preparation edition imports local images and does not offer unreviewed archive downloads or native engine downloads. The developer edition can contact WinWorld, Internet Archive, GitHub, and download mirrors when you explicitly search for or download software or prepare an engine. Such services receive ordinary network request information, including your IP address and the requested search or file, under their own policies. Opening support, documentation, or source links in your browser also contacts the linked service.
+The Mac App Store edition imports local images and does not offer unreviewed archive downloads or native engine downloads. The developer edition can contact WinWorld, Internet Archive, GitHub, and download mirrors when you explicitly search for or download software or prepare an engine. Such services receive ordinary network request information, including your IP address and the requested search or file, under their own policies. Opening support, documentation, or source links in your browser also contacts the linked service.
 
 Apple may provide its own diagnostics or crash reporting according to your system settings and Apple's privacy policy. Those platform services are separate from DosMac telemetry.
 
@@ -32,4 +32,6 @@ You control the files you import, share, export, and back up. Uninstalling an ap
 
 For questions, use [DosMac support](support.md). GitHub issues are public and governed by GitHub's privacy policy; include only information you intend to publish. Never post product keys, passwords, personal documents, or guest disks.
 
-This policy describes the repository's current behavior. Store privacy answers and dependency API declarations must be checked against the exact binary submitted for distribution.
+## Changes to this policy
+
+We update this page when the application's or website's privacy practices change. The last-updated date and public project history show its revisions.
