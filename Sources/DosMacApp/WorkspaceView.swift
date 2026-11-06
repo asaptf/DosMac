@@ -622,6 +622,18 @@ struct WorkspaceView: View {
                 }
               }.disabled(machines.busy)
               SessionMediaMenu(model: machines, preferredMedia: playingMedia)
+              if !machines.displayModes.isEmpty {
+                Menu("Display") {
+                  Toggle("Fit Windows to window", isOn: Binding(get: { machines.displayAutomatic }, set: { machines.setAutomaticDisplay($0) }))
+                  Divider()
+                  ForEach(machines.displayModes, id: \.self) { size in
+                    Button(size.title) {
+                      machines.setAutomaticDisplay(false)
+                      machines.session.guestDisplay?.request(size)
+                    }
+                  }
+                }.disabled(machines.busy)
+              }
               Menu {
                 Button("Type text in guest…") { sheet = .guestText }
                 Button("Ctrl + Alt + Del") {
@@ -671,6 +683,7 @@ struct WorkspaceView: View {
                   ? "Mouse captured · Control + Option releases input"
                   : "Click the screen to use mouse and keyboard")
               Spacer()
+              if !machines.displayModes.isEmpty { Text(machines.displayMessage) }
               Button("Files") { section = .files }
             }.font(.caption).foregroundStyle(.secondary)
           } else {

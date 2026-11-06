@@ -36,13 +36,46 @@ struct GuestPointerTests {
         try FileManager.default.copyItem(at: source, to: disk)
         machine.boot = .hardDisk; machine.sharedFolder = true
         machine.installation = InstallationRecord(recipeID: Windows9xRecipe.id(for: .windows98), stage: .complete)
-        let files = GuestToolsMedia.mouseFiles(driver: try Data(contentsOf: assets.appendingPathComponent("qemouse.drv")), inf: try Data(contentsOf: assets.appendingPathComponent("qemouse.inf")))
+        let withDisplay = env["DOSMAC_TEST_DISPLAY_AGENT"] == "1"
+        let files = GuestToolsMedia.mouseFiles(driver: try Data(contentsOf: assets.appendingPathComponent("qemouse.drv")), inf: try Data(contentsOf: assets.appendingPathComponent("qemouse.inf")), agent: withDisplay ? try Data(contentsOf: assets.appendingPathComponent("dmagent.exe")) : nil)
         let session = MachineSession()
         try await session.start(machine, directory: directory, muted: true)
         defer { session.terminate() }
         do {
             try await GuestToolsInstaller(session: session).installMouse(files: files) { print($0); fflush(nil) }
             try #require(session.absolutePointer)
+            if withDisplay {
+                let bridge = try #require(session.guestDisplay)
+                try #require(bridge.ready)
+                print("Guest display modes: \(bridge.modes.map(\.title))")
+                let target = GuestDisplaySize(800, 600)
+                try #require(bridge.modes.contains(target))
+                bridge.request(target)
+                let resizeDeadline = Date().addingTimeInterval(15)
+                while Date() < resizeDeadline, session.frameSnapshot()?.width != 800 || session.frameSnapshot()?.height != 600 || bridge.current != target {
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                print("Resize acknowledgement: \(bridge.message)")
+                if let reply = try? String(contentsOf: directory.appendingPathComponent("Shared/DMTOOLS/STATUS.TXT"), encoding: .ascii) { print("Display reply: \(reply)") }
+                try #require(session.frameSnapshot()?.width == 800)
+                try #require(session.frameSnapshot()?.height == 600)
+                try #require(bridge.current == target)
+                print("Confirmed real Windows framebuffer at 800 x 600")
+                bridge.setAutomatic(true)
+                bridge.fit(width: 1100, height: 800)
+                let fitDeadline = Date().addingTimeInterval(15)
+                while Date() < fitDeadline, session.frameSnapshot()?.width != 1024 || session.frameSnapshot()?.height != 768 || bridge.current != GuestDisplaySize(1024,768) {
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                try #require(session.frameSnapshot()?.width == 1024)
+                try #require(session.frameSnapshot()?.height == 768)
+                print("Confirmed automatic fit at 1024 x 768")
+                bridge.setAutomatic(false)
+                bridge.request(GuestDisplaySize(640,480))
+                let restoreDeadline = Date().addingTimeInterval(15)
+                while Date() < restoreDeadline, bridge.current != GuestDisplaySize(640,480) { try await Task.sleep(for: .milliseconds(250)) }
+                try #require(bridge.current == GuestDisplaySize(640,480))
+            }
             // Windows must finish booting and shut down normally. Cutting power
             // during driver startup makes the next boot choose Safe Mode.
             var shutdownShown = false
@@ -74,6 +107,11 @@ struct GuestPointerTests {
             try await session.start(machine, directory: directory, muted: true)
             let deadline = Date().addingTimeInterval(120)
             while !session.absolutePointer, Date() < deadline { try await Task.sleep(for: .milliseconds(250)) }
+            if withDisplay {
+                let agentDeadline = Date().addingTimeInterval(90)
+                while session.guestDisplay?.ready != true, Date() < agentDeadline { try await Task.sleep(for: .milliseconds(500)) }
+                #expect(session.guestDisplay?.ready == true)
+            }
             if !session.absolutePointer {
                 let text = try await session.observeScreenText()
                 if !text.lowercased().contains("password") { print("Cold boot diagnostic: \(text)") }

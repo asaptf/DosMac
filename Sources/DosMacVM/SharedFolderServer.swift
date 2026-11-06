@@ -74,6 +74,8 @@
         read only = no
         guest ok = yes
         guest only = yes
+        oplocks = no
+        level2 oplocks = no
         follow symlinks = no
         wide links = no
         """

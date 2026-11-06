@@ -66,6 +66,7 @@ public struct Machine: Codable, Identifiable, Equatable, Sendable {
     public let createdAt: Date
     public var installation: InstallationRecord?
     public var sharedDisk: Bool?
+    public var automaticDisplay: Bool?
     public var sharedFolder: Bool?
 
     public init(id: UUID = UUID(), name: String, guest: GuestSystem, boot: BootDevice = .floppy, floppies: [MachineMedia] = [], cdroms: [MachineMedia] = []) {

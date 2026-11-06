@@ -1,0 +1,7 @@
+{
+  "source": "GuestTools/Agent/agent.c",
+  "sha256": "bf4df668842e6554160be6b55cd0f312910e38bee04dfa33d35eb6b80ca157e0",
+  "target": "Win32 x86, subsystem 4.0, no CRT",
+  "sourceSHA256": "56bcb0bb34d32e6ab69d317e3808db01d05716efe5cb66d87c972896aec2b6c9",
+  "compiler": "Homebrew clang version 23.1.5"
+}

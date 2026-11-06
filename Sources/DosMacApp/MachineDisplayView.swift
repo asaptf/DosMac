@@ -61,6 +61,8 @@ struct MachineDisplayView: NSViewRepresentable {
         if view.absolutePointer != absolutePointer { view.releaseCapture(); view.absolutePointer = absolutePointer }
         if !inputEnabled { view.releaseCapture() }
         view.frameImage = image; view.needsDisplay = true
+        view.onViewport = { [weak session] width, height in session?.guestDisplay?.fit(width: width, height: height) }
+        view.onViewport?(Int(view.bounds.width), Int(view.bounds.height))
     }
     static func dismantleNSView(_ view: GuestDisplayView, coordinator: ()) { view.releaseCapture() }
 }
@@ -72,6 +74,12 @@ final class GuestDisplayView: NSView {
     var onCapture: ((Bool) -> Void)?
     var inputEnabled = true
     var absolutePointer = false
+    var onViewport: ((Int, Int) -> Void)?
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        let width = Int(newSize.width), height = Int(newSize.height)
+        Task { [weak self] in self?.onViewport?(width, height) }
+    }
     private var seamlessCursorHidden = false
     private var absoluteEvents: [(Int, Int, String?, Bool)] = []
     private var absoluteInputTask: Task<Void, Never>?

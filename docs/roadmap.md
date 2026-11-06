@@ -35,7 +35,11 @@ Exit: one prepared recipe installs all three products, boots from HDD, launches 
 - [x] Native absolute pointer with free host/guest crossing and relative-input fallback.
 - [x] Windows 98 visual acceptance: click, double-click, drag and right-click.
 - [ ] Windows 95 and Windows 3.x mouse acceptance.
-- [ ] Adaptive resolution: guest display driver and resize agent.
+- [x] Original Windows display agent, confirmed mode switching, and native resolution menu.
+- [x] Windows 98 automatic fitting, normal shutdown and agent cold-boot acceptance.
+- [x] Native Display menu and saved per-computer fitting preference.
+- [ ] Final visual pass of the rebuilt display agent (Mac locked).
+- [ ] Replacement virtual display driver and arbitrary widescreen resolutions.
 - [ ] Guest control, clipboard and file-operation agent over a private host channel.
 
 ### Extend and release

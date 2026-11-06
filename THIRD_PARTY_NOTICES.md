@@ -35,3 +35,7 @@ SOFTWARE.
 ## DOSBox-X
 
 DosMac's macOS adapter invokes [DOSBox-X](https://github.com/joncampbell123/dosbox-x), automatically downloaded from the official 2026.10.01 release or supplied by the user. No DOSBox-X binary is linked, bundled, or redistributed in this repository. The managed download retains the upstream app, COPYING.txt, README.txt, and other accompanying files. Its GPL license and notices apply to that installation. [Release and source](https://github.com/joncampbell123/dosbox-x/releases/tag/dosbox-x-v2026.10.01). A future bundled or embedded release must audit the selected upstream revision and linked components and ship all corresponding notices and required source.
+
+## QEMouse v1.03
+
+The embedded mouse driver is GPL-2.0 licensed. Its exact corresponding source, license and provenance are included in `Sources/DosMacApp/Resources/GuestTools`. See [Guest Tools](docs/guest-tools.md) and the [upstream project](https://github.com/qemus/qemouse). DosMac's display agent is an original, separate MIT-licensed component; its license is in `GuestTools/Agent/LICENSE`.

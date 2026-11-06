@@ -13,6 +13,9 @@ final class MachineLibraryModel: ObservableObject {
     @Published var state = MachineState.stopped
     @Published var captured = false
     @Published var absolutePointer = false
+    @Published var displayModes: [GuestDisplaySize] = []
+    @Published var displayAutomatic = false
+    @Published var displayMessage = ""
     @Published var operationMessage: String?
     private var installationTask: Task<Void, Never>?
     #if os(macOS)
@@ -40,6 +43,12 @@ final class MachineLibraryModel: ObservableObject {
         }
         session.onDisplayError = { [weak self] in self?.error = $0 }
         session.onAbsolutePointer = { [weak self] in self?.absolutePointer = $0 }
+        session.onGuestDisplayChange = { [weak self] in
+            guard let self else { return }
+            self.displayModes = self.session.guestDisplay?.modes ?? []
+            self.displayAutomatic = self.session.guestDisplay?.automatic ?? false
+            self.displayMessage = self.session.guestDisplay?.message ?? ""
+        }
         session.onFrame = { [weak self] frame in
             guard let provider = CGDataProvider(data: frame.pixels as CFData) else { return }
             self?.image = CGImage(width: frame.width, height: frame.height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: frame.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue).union(.byteOrder32Big), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
@@ -186,6 +195,18 @@ final class MachineLibraryModel: ObservableObject {
         #endif
     }
 
+    func setAutomaticDisplay(_ enabled: Bool) {
+        #if os(macOS)
+        session.guestDisplay?.setAutomatic(enabled)
+        guard let store, var machine = current else { return }
+        machine.automaticDisplay = enabled
+        Task {
+            do { try await store.save(machine); await refresh() }
+            catch { self.error = error.localizedDescription }
+        }
+        #endif
+    }
+
     func installGuestTools() {
         #if os(macOS)
         guard let store, let machine = current, !active, !busy, machine.guest.needsCD,
@@ -207,7 +228,8 @@ final class MachineLibraryModel: ObservableObject {
                 }
                 let files = try GuestToolsMedia.mouseFiles(
                     driver: asset("qemouse.drv", hash: "049b0cc00ba812c00fcf5c7b68e1676c827a3c7d3551bb248e280d18ce4d46b9"),
-                    inf: asset("qemouse.inf", hash: "00cbdf229e586708081ae35a6840c8ffe99fbd8b8dd21137934bb28f829490f1"))
+                    inf: asset("qemouse.inf", hash: "00cbdf229e586708081ae35a6840c8ffe99fbd8b8dd21137934bb28f829490f1"),
+                    agent: machine.sharedFolder == true ? asset("dmagent.exe", hash: "bf4df668842e6554160be6b55cd0f312910e38bee04dfa33d35eb6b80ca157e0") : nil)
                 self.operationMessage = "Saving a recovery copy before installing Guest Tools…"
                 let directory = store.directory(for: machine.id)
                 let backup = directory.appendingPathComponent("Backups/GuestTools-\(UUID().uuidString)")
@@ -217,7 +239,7 @@ final class MachineLibraryModel: ObservableObject {
                 self.image = nil
                 try await self.session.start(boot, directory: directory)
                 try await GuestToolsInstaller(session: self.session).installMouse(files: files) { self.operationMessage = $0 }
-                self.notice = "Guest Tools: seamless mouse is active. Recovery disk: \(backup.path)."
+                self.notice = "Guest Tools are active. Recovery disk: \(backup.path)."
             } catch is CancellationError { self.notice = "Guest Tools paused. Review Windows before restarting or retrying; the recovery disk is kept." }
             catch { self.error = error.localizedDescription }
         }
@@ -519,7 +541,7 @@ struct MachineLibraryView: View {
                         if machine.guest.needsCD, machine.installation?.stage == .complete {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Guest Tools").font(.headline)
-                                Text("Seamless mouse for English Windows 95/98 (Windows 95 is experimental). Shut down Windows first; DosMac saves a recovery disk, installs the embedded driver, and restarts Windows.").font(.callout).foregroundStyle(.secondary)
+                                Text("Seamless mouse for English Windows 95/98 (Windows 95 is experimental). With the live shared folder enabled and mapped to H:, Guest Tools also adds display controls and fitting Windows to the window. Shut down Windows first; a recovery disk is saved before installation.").font(.callout).foregroundStyle(.secondary)
                                 Button("Install Guest Tools") { model.installGuestTools() }.disabled(model.active || model.busy)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }

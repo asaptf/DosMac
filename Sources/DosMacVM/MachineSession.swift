@@ -13,6 +13,8 @@ public final class MachineSession {
     public var onDisplayError: (@MainActor (String) -> Void)?
     public var onAbsolutePointer: (@MainActor (Bool) -> Void)?
     public private(set) var absolutePointer = false
+    public private(set) var guestDisplay: GuestDisplayBridge?
+    public var onGuestDisplayChange: (() -> Void)?
     private var pointerMonitor: Task<Void, Never>?
     public private(set) var currentFloppy: UUID?
     public private(set) var currentCD: UUID?
@@ -45,7 +47,12 @@ public final class MachineSession {
         self.runtime = runtime; self.machine = machine; self.directory = directory
         if machine.sharedFolder == true {
             let server = SharedFolderServer()
-            do { try await server.start(directory: directory, runtime: runtime); sharing = server }
+            do {
+                try await server.start(directory: directory, runtime: runtime); sharing = server
+                let bridge = GuestDisplayBridge(sharedDirectory: directory.appendingPathComponent("Shared"))
+                bridge.onChange = { [weak self] in self?.onGuestDisplayChange?() }
+                try bridge.start(); bridge.setAutomatic(machine.automaticDisplay == true); guestDisplay = bridge
+            }
             catch { await cleanup(); state = .failed(error.localizedDescription); throw error }
         }
         let input = Pipe(), output = Pipe()
@@ -161,11 +168,23 @@ public final class MachineSession {
         _ = try await qmp.execute("send-key", arguments: ["keys": .array(qcodes.map { .object(["type": .string("qcode"), "data": .string($0)]) }), "hold-time": .number(50)])
         try await Task.sleep(for: .milliseconds(80))
     }
-    public func typeText(_ text: String) async throws {
+    public func typeText(_ text: String, paced: Bool = false) async throws {
         let strokes = try GuestTyping.strokes(for: text)
         for stroke in strokes {
             try Task.checkCancellation()
-            try await sendChord(stroke.shift ? ["shift", stroke.qcode] : [stroke.qcode])
+            let keys = stroke.shift ? ["shift", stroke.qcode] : [stroke.qcode]
+            if paced {
+                // QEMU send-key releases keys on a virtual timer. Under Win9x
+                // startup load that timer can overlap the next character.
+                for code in keys { try await key(qcode: code, down: true) }
+                do { try await Task.sleep(for: .milliseconds(60)) }
+                catch {
+                    for code in keys.reversed() { try? await key(qcode: code, down: false) }
+                    throw error
+                }
+                for code in keys.reversed() { try await key(qcode: code, down: false) }
+                try await Task.sleep(for: .milliseconds(90))
+            } else { try await sendChord(keys) }
         }
     }
     public func mountSupportDisk(files: [String: Data]) async throws {
@@ -270,12 +289,16 @@ public final class MachineSession {
     }
 
     private func receive(_ frame: VMFrame) { latestFrame = frame; textDisplay = frame.width == 720 && frame.height == 400; onFrame?(frame) }
-    private func displayFailed(_ message: String) {
-        // Guest-initiated ACPI shutdown closes the display socket normally.
-        guard isActive else { return }
+    private func displayFailed(_ message: String) async {
+        // ACPI shutdown closes RFB before QEMU finishes flushing its disk.
+        // Report a disconnect only if the same VM remains alive after that grace period.
+        guard let source = process else { return }
+        do { try await Task.sleep(for: .seconds(1)) } catch { return }
+        guard process === source, isActive else { return }
         onDisplayError?(message)
     }
     private func cleanup() async {
+        guestDisplay?.stop(); guestDisplay = nil; onGuestDisplayChange?()
         pointerMonitor?.cancel(); pointerMonitor = nil
         absolutePointer = false; onAbsolutePointer?(false)
         sharing?.stop(); sharing = nil
