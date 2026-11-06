@@ -1,0 +1,6 @@
+{
+  "name": "DosMac",
+  "url": "https://asaptf.github.io/DosMac/",
+  "repository": "https://github.com/asaptf/DosMac",
+  "bundleIdentifier": "tech.andrey.dosmac"
+}

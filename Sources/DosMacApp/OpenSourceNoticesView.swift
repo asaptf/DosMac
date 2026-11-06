@@ -20,8 +20,8 @@ struct OpenSourceNoticesView: View {
                 }
                 Link("Native component source snapshot", destination: URL(string: "https://github.com/asaptf/DosMac/releases/tag/store-source-snapshot-2026-11-06-minimal")!)
                 Link("Project source and notices", destination: URL(string: "https://github.com/asaptf/DosMac")!)
-                Link("Privacy policy", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/privacy.md")!)
-                Link("Support", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/support.md")!)
+                Link("Privacy policy", destination: URL(string: "https://asaptf.github.io/DosMac/privacy/")!)
+                Link("Support", destination: URL(string: "https://asaptf.github.io/DosMac/support/")!)
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }
     }

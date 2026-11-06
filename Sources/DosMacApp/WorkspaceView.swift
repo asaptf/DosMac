@@ -558,8 +558,8 @@ struct WorkspaceView: View {
           Text("The guided Windows setup uses your local ISO and an English Windows 98 SE OEM startup floppy with CD-ROM support. You enter your own product key in the installer.").font(.caption).foregroundStyle(.secondary)
         }.padding(24).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
         HStack {
-          Link("Privacy policy", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/privacy.md")!)
-          Link("Support", destination: URL(string: "https://github.com/asaptf/DosMac/blob/main/docs/support.md")!)
+          Link("Privacy policy", destination: URL(string: "https://asaptf.github.io/DosMac/privacy/")!)
+          Link("Support", destination: URL(string: "https://asaptf.github.io/DosMac/support/")!)
         }.font(.callout)
       }.padding(30).frame(maxWidth: 1100).frame(maxWidth: .infinity)
     }.navigationTitle("Discover")

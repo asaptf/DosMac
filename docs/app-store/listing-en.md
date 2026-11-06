@@ -47,8 +47,10 @@ Utilities. Confirm the final category and age-rating answers against the actual 
 
 ## URLs
 
-- Support: https://github.com/asaptf/DosMac/blob/main/docs/support.md
-- Privacy: https://github.com/asaptf/DosMac/blob/main/docs/privacy.md
+- Marketing: https://asaptf.github.io/DosMac/
+
+- Support: https://asaptf.github.io/DosMac/support/
+- Privacy: https://asaptf.github.io/DosMac/privacy/
 - Source: https://github.com/asaptf/DosMac
 
 ## Privacy answers to verify at submission

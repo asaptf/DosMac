@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="$description">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#14231d">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="$title">
+  <meta property="og:description" content="$description">
+  <meta property="og:url" content="$canonical">
+  <link rel="canonical" href="$canonical">
+  <link rel="icon" type="image/png" href="$base/assets/icon.png">
+  <link rel="stylesheet" href="$base/assets/site.css">
+  <title>$title</title>
+</head>
+<body class="$page_class">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="$base/" aria-label="DosMac home"><img src="$base/assets/icon.png" width="38" height="38" alt=""><span>DosMac</span></a>
+      <nav aria-label="Main navigation">
+        <a href="$base/" $nav_home>Overview</a>
+        <a href="$base/privacy/" $nav_privacy>Privacy</a>
+        <a href="$base/support/" $nav_support>Support</a>
+        <a class="source-link" href="https://github.com/asaptf/DosMac">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </header>
+  <main id="main" tabindex="-1">$content</main>
+  <footer class="site-footer">
+    <div><a class="footer-brand" href="$base/">DosMac</a><p>A place for your classic software.</p></div>
+    <nav aria-label="Footer navigation"><a href="$base/privacy/">Privacy policy</a><a href="$base/support/">Support</a><a href="https://github.com/asaptf/DosMac">Source code</a></nav>
+    <p class="copyright">© 2026 DosMac · Hosted on GitHub Pages</p>
+  </footer>
+</body>
+</html>

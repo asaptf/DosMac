@@ -2,7 +2,7 @@
 
 Last updated: November 6, 2026.
 
-DosMac runs retro software locally. The DosMac project does not operate an app analytics, advertising, account, or cloud-storage service. The application does not collect or send your guest disks, documents, product keys, or usage history to the project maintainers. There is no tracking or advertising SDK.
+This policy applies to DosMac, published by the asaptf/DosMac project, including the application identified as `tech.andrey.dosmac`. DosMac runs retro software locally. The DosMac project does not operate an app analytics, advertising, account, or cloud-storage service. The application does not collect or send your guest disks, documents, product keys, or usage history to the project maintainers. There is no tracking or advertising SDK.
 
 ## Local storage
 
@@ -21,6 +21,10 @@ Guest operating systems and applications have their own behavior and privacy pra
 The App Store preparation edition imports local images and does not offer unreviewed archive downloads or native engine downloads. The developer edition can contact WinWorld, Internet Archive, GitHub, and download mirrors when you explicitly search for or download software or prepare an engine. Such services receive ordinary network request information, including your IP address and the requested search or file, under their own policies. Opening support, documentation, or source links in your browser also contacts the linked service.
 
 Apple may provide its own diagnostics or crash reporting according to your system settings and Apple's privacy policy. Those platform services are separate from DosMac telemetry.
+
+## This website
+
+The public DosMac website is hosted on GitHub Pages. It does not add analytics scripts, advertising, external font services, contact forms, or tracking cookies. GitHub may process technical request information, including IP addresses and request logs, when serving the site under its [privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement). This website hosting is separate from the local data stored by the DosMac application.
 
 ## Control and support
 
