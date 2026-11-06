@@ -4,7 +4,7 @@ Status: active work, not a submission-ready release. Updated November 6, 2026.
 
 ## Editions
 
-`DosMac-macOS` remains the developer edition. `DosMac-AppStore` is a separate, sandboxed preparation target, currently Apple Silicon and macOS 27+ only, with bundle identifier `org.dosmac.store`. Its private container does not migrate or alter the existing developer library. The final App ID and store metadata must be checked in the owner's account before submission.
+`DosMac-macOS` remains the developer edition. `DosMac-AppStore` is a separate, sandboxed preparation target, currently Apple Silicon and macOS 27+ only, with bundle identifier `tech.andrey.dosmac`. Its private container does not migrate or alter the existing developer library. The final App ID and store metadata must be checked in the owner's account before submission.
 
 The preparation target imports user-supplied images and includes an original PC hardware diagnostic. Discover has no unreviewed archive catalog. Local Windows 95/98 media can enter the existing guided installer. Native engine downloads and external engine overrides are rejected in the backends, not merely hidden in the UI. Classic DOSBox-X packages remain in the developer edition. Host disk mounting is developer-only; the store preparation target uses its live folder and exchange images for host transfers.
 
@@ -91,3 +91,7 @@ The [first public source snapshot](https://github.com/asaptf/DosMac/releases/tag
 The minimal probe currently contains 21 native source components and 107 executable/library files, with 214 source notice texts. Its boundary check also verifies the declared macOS minimum and the QEMU dependency graph.
 
 The project-built minimal engine also passed the existing DOS → Windows 3.1 → Word 6 save/export workflow on a private stopped-reference copy. That regression ran through the developer test host; the signed-container Windows 98 and file-panel results are separate acceptance evidence.
+
+## Application identity
+
+The shipping macOS and iOS app targets use the owner-selected identifier `tech.andrey.dosmac`. Earlier prototype exports used another identifier and must not be submitted as the renamed app. The test-only sandbox probe retains its own independent identifier and private fixtures; DOS library package IDs are separate from the application Bundle ID.

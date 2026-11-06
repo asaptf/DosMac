@@ -48,7 +48,15 @@ if [[ "${1:-}" == "--export" ]]; then
     > "$candidate/export.log" 2>&1
   pkgutil --check-signature "$candidate/export/DosMac.pkg" > "$candidate/installer-signature.txt"
   pkgutil --expand-full "$candidate/export/DosMac.pkg" "$candidate/export-expanded"
-  exported="$candidate/export-expanded/org.dosmac.store.pkg/Payload/DosMac.app"
+  exported="$(python3 - "$candidate/export-expanded" <<'PYAPP'
+from pathlib import Path
+import sys
+matches = list(Path(sys.argv[1]).glob('*/Payload/DosMac.app'))
+if len(matches) != 1:
+    raise SystemExit('Expected one exported DosMac application')
+print(matches[0])
+PYAPP
+)"
   python3 scripts/verify-store-bundle.py --app "$exported" --distribution > "$candidate/exported-boundaries.json"
   python3 scripts/audit-required-apis.py --app "$exported" > "$candidate/exported-api-imports.json"
   printf 'Export prepared: %s/export\n' "$candidate"

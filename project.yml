@@ -1,6 +1,6 @@
 name: DosMac
 options:
-  bundleIdPrefix: org.dosmac
+  bundleIdPrefix: tech.andrey.dosmac
   deploymentTarget:
     macOS: '14.0'
     iOS: '17.0'
@@ -28,7 +28,7 @@ targets:
         product: DosMacPlatform
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app
+        PRODUCT_BUNDLE_IDENTIFIER: tech.andrey.dosmac
         PRODUCT_NAME: DosMac
         ENABLE_APP_SANDBOX: NO
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
@@ -45,7 +45,7 @@ targets:
         product: DosMacPlatform
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.app
+        PRODUCT_BUNDLE_IDENTIFIER: tech.andrey.dosmac
         PRODUCT_NAME: DosMac
         TARGETED_DEVICE_FAMILY: '1,2'
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -72,7 +72,7 @@ targets:
     settings:
       base:
         ARCHS: arm64
-        PRODUCT_BUNDLE_IDENTIFIER: org.dosmac.store
+        PRODUCT_BUNDLE_IDENTIFIER: tech.andrey.dosmac
         PRODUCT_NAME: DosMac
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
