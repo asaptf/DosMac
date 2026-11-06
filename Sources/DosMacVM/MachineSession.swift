@@ -182,7 +182,8 @@ public final class MachineSession {
     }
     public func mountSupportDisk(files: [String: Data]) async throws {
         guard let qmp, let runtime else { throw VMError.notRunning }
-        let file = runtime.appendingPathComponent("support.img")
+        // Keep the previous image intact until QEMU has switched media.
+        let file = runtime.appendingPathComponent("support-\(UUID().uuidString).img")
         try FAT12Disk.make(files: files).write(to: file, options: .atomic)
         _ = try await qmp.execute("blockdev-change-medium", arguments: ["device": .string("floppy0"), "filename": .string(file.path), "format": .string("raw"), "force": .bool(true)])
         currentFloppy = nil

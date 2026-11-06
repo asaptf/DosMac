@@ -24,19 +24,19 @@ The exact later repeat results and release validation must accompany the candida
 | Gate | State |
 | --- | --- |
 | Developer and store UI builds and original-fixture regressions | Developer, store, and iOS UI builds passed; 28 VM and 38 Core tests passed. Final packaged acceptance remains open |
-| Original diagnostic color pattern and saved Library shortcut | Original diagnostic renders; final return-to-text and Library shortcut repeat in progress |
+| Original diagnostic color pattern and saved Library shortcut | Visually passed in the signed self-contained store target: text → color pattern → text, saved Library entry, keyboard capture/release and power-off |
 | User-selected file imports/exports inside sandbox | End-to-end panel tests pending |
-| Windows 98 startup, Guest Tools, live file exchange inside sandbox | Startup, mouse integration and actual 800 × 600 mode passed on a private fixture; guest C: file-copy round trip is being diagnosed |
+| Windows 98 startup, Guest Tools, live file exchange inside sandbox | Startup, mouse integration and actual 800 × 600 mode passed on a private fixture. 3 MiB host → guest C: → host round trip matched byte for byte, followed by normal shutdown and cold boot with Guest Tools reconnection. Repeated support-floppy insertion remains a separate open issue |
 | Windows 95 full desktop acceptance | Pending |
 | Complete native dependency license and source inventory | 32 primary archives and 6 additional recipe inputs verified; GLib local patch pinned against the installed recipe. 222 source notice texts collected. Complete-source and store-term review remain open |
 | Distribution of GPL and other dependencies under store terms | Requires review for the exact binary and distribution terms; Apache-2.0 does not remove upstream obligations |
 | Required-reason API audit of native dependencies | Native symbol inventory and four categories declared with [purpose notes](app-store/privacy-api-review.md); exact exported-app and call-site review pending |
-| About/open-source notices accessible in the app | Settings license view implemented; final visual check pending |
+| About/open-source notices accessible in the app | Visually verified the Settings license list and expanded Apache-2.0 text in the signed app |
 | Final icon, store-sized screenshots, preview video and metadata | In progress |
-| Release archive, App Store provisioning and upload validation | Apple Development-signed Release archive built; self-contained packaging, export and upload validation pending |
+| Release archive, App Store provisioning and upload validation | Self-contained Release archive exported successfully after owner login. The extracted 37 MB store package has an Apple Distribution signature, matching embedded profile and installer signature; nested boundaries and helper entitlements passed after export. Server upload/validation and TestFlight remain pending |
 | TestFlight, real clean-Mac acceptance, reviewer demonstration | Pending |
 | App Store account agreements and final legal acceptance | Owner action if prompted |
-| iPhone guest execution and device acceptance | Not implemented; a separate runtime effort, not covered by the Mac probe |
+| iPhone guest execution and device acceptance | Not implemented; [runtime investigation](app-store/iphone-runtime.md) records the interpreter approach and device gates |
 
 ## Local sandbox probe
 
@@ -71,3 +71,11 @@ A helper signed for sandbox inheritance must be launched by its sandboxed parent
 - [App Privacy](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy).
 
 Native placement follows [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/). App Store upload and acceptance remain separate checks.
+
+## Repeatable candidate assembly
+
+`scripts/build-store-candidate.sh` creates a new timestamped archive, embeds signed helpers and source notices, and saves boundary and API-import reports. Set `DOSMAC_TEAM_ID`, `DOSMAC_SIGN_IDENTITY`, and `DOSMAC_SOURCE_DIR` for your own team and verified source directory. Optional `--export` attempts a local App Store export; it does not upload or submit the app. Xcode must have an authenticated developer account, an appropriate installer signing identity and a matching store profile. Exported package signatures and entitlements still need verification after Xcode re-signs the archive.
+
+English [listing](app-store/listing-en.md) and [review notes](app-store/review-notes-en.md) are drafts for the eventual submitted build.
+
+Source-package assembly and its remaining review boundaries are documented in [Engine source delivery](app-store/source-delivery.md).

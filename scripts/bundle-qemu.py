@@ -6,6 +6,7 @@ Not a notarized release pipeline. Audit licenses/source obligations before redis
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -93,6 +94,12 @@ def main():
             subprocess.run(["install_name_tool", "-change", dependency, relative, str(target)], check=True, capture_output=True)
         if target.parent == libraries:
             subprocess.run(["install_name_tool", "-id", "@rpath/" + target.name, str(target)], check=True, capture_output=True)
+        # Every non-system dependency now uses an explicit bundle-relative path.
+        # Do not retain search paths into the builder's Homebrew installation.
+        load_commands = command("otool", "-l", str(target))
+        for rpath in re.findall(r"cmd LC_RPATH\n.*?\n\s*path (.*?) \(offset", load_commands):
+            if rpath.startswith(("/opt/", "/usr/local/")):
+                subprocess.run(["install_name_tool", "-delete_rpath", rpath, str(target)], check=True, capture_output=True)
         return target
 
     for name in ["qemu-system-i386", "qemu-img"]:
@@ -130,8 +137,11 @@ def main():
         keg = Path(*parts[:index + 3])
         recipe = keg / ".brew" / (component + ".rb")
         receipt = keg / "INSTALL_RECEIPT.json"
+        known = key in components
         item = components.setdefault(key, {"name": component, "version": installed_version, "files": []})
         item["files"].append(str(target.relative_to(app)))
+        if known:
+            continue
         license_dir = destination / "Licenses" / key
         license_dir.mkdir(parents=True, exist_ok=True)
         for source_file in [recipe, receipt]:
@@ -152,7 +162,7 @@ def main():
             raise RuntimeError("Some native binaries lack source provenance. Supply reviewed source metadata for custom engines before assembling a candidate.")
         subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "collect-source-notices.py"), "--sources", str(args.sources), "--app", str(app)], check=True)
         shutil.copy2(args.sources / "sources.json", destination / "source-evidence.json")
-    manifest = {"version": version, "purpose": "local developer build", "upstream": "https://www.qemu.org/", "nativeFiles": [str(p.relative_to(app)) for p in copied.values()], "files": {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in destination.rglob("*") if p.is_file()}}
+    manifest = {"version": version, "purpose": "sandboxed store preparation" if args.sandbox else "local developer build", "upstream": "https://www.qemu.org/", "nativeFiles": [str(p.relative_to(app)) for p in copied.values()], "assemblyNativeSHA256": {str(p.relative_to(app)): hashlib.sha256(p.read_bytes()).hexdigest() for p in copied.values()}, "files": {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in destination.rglob("*") if p.is_file()}}
     (destination / "build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (destination / "DEVELOPER-NOTICE.txt").write_text("Local development bundle only. QEMU, SeaBIOS, VGA BIOS, and linked libraries retain their respective licenses. A redistributable build must include their notices and required corresponding source. This script does not establish distribution compliance or notarization.\n")
     # Xcode Debug can split the app into an executable and a debug dylib.

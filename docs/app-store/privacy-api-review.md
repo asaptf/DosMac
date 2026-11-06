@@ -16,3 +16,7 @@ The public privacy policy describes local data, sharing, external documentation 
 Before submission, repeat the import inventory against the actual exported app, check that all reported categories are declared, review native call sites and SDK requirements, and generate Xcode's privacy report. No API declaration is a permission to fingerprint users or collect data under a different purpose.
 
 Sources: [Apple required-reason API list](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype), [TN3183](https://developer.apple.com/documentation/technotes/tn3183-adding-required-reason-api-entries-to-your-privacy-manifest).
+
+## Source spot-check: GLib preferences
+
+The packaged UI symbol inventory also reports `NSUserDefaults` in `libgio-2.0.0.dylib`. The verified GLib 2.90.1 source archive places this use in `gio/gnextstepsettingsbackend.m`: its initializer retains `standardUserDefaults`; read/write functions use the supplied GSettings key, and the backend does not request another named preference domain. This is an additional library call site to review under the app-settings purpose. It is not evidence that every native call site has been reviewed. The archive hash and exact recipe are recorded by the source collector.

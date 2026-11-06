@@ -30,24 +30,26 @@ import DosMacVM
         log("Guest Tools and 800 x 600 display confirmed. Starting the guest file-copy test.")
         let batch = """
         @ECHO OFF
-        ECHO DOSMAC COPY START >A:\\STATUS.TXT
-        COPY /B H:\\DMTOOLS\\HOST.BIN C:\\DMTOOLS\\QA-ROUND.BIN >>A:\\STATUS.TXT
+        ECHO DOSMAC COPY START >H:\\DMTOOLS\\STATUS.TXT
+        COPY /B H:\\DMTOOLS\\HOST.BIN C:\\DMTOOLS\\QA-ROUND.BIN >>H:\\DMTOOLS\\STATUS.TXT
         IF ERRORLEVEL 1 GOTO FAILED
-        ECHO DOSMAC HOST READ COMPLETE >>A:\\STATUS.TXT
-        COPY /B C:\\DMTOOLS\\QA-ROUND.BIN H:\\DMTOOLS\\GUEST.BIN >>A:\\STATUS.TXT
+        ECHO DOSMAC HOST READ COMPLETE >>H:\\DMTOOLS\\STATUS.TXT
+        COPY /B C:\\DMTOOLS\\QA-ROUND.BIN H:\\DMTOOLS\\GUEST.BIN >>H:\\DMTOOLS\\STATUS.TXT
         IF ERRORLEVEL 1 GOTO FAILED
-        ECHO DOSMAC COPY END >>A:\\STATUS.TXT
+        ECHO DOSMAC COPY END >>H:\\DMTOOLS\\STATUS.TXT
         ECHO DOSMAC SANDBOX COPY COMPLETE
         PAUSE >NUL
         EXIT
         :FAILED
-        ECHO DOSMAC COPY FAILED >>A:\\STATUS.TXT
+        ECHO DOSMAC COPY FAILED >>H:\\DMTOOLS\\STATUS.TXT
         ECHO DOSMAC SANDBOX COPY FAILED
         PAUSE >NUL
         EXIT
         """.replacingOccurrences(of: "\n", with: "\r\n") + "\r\n"
-        try await session.mountSupportDisk(files: ["SHARE.BAT":Data(batch.utf8)])
-        try await run("C:\\COMMAND.COM /C A:\\SHARE.BAT", session: session)
+        // Exercise the live-share path independently of removable media.
+        // A separate acceptance case must cover the second floppy swap.
+        try Data(batch.utf8).write(to: shared.appendingPathComponent("SHARE.BAT"))
+        try await run("C:\\COMMAND.COM /C H:\\DMTOOLS\\SHARE.BAT", session: session)
         let copyDeadline = Date().addingTimeInterval(60)
         let returned = shared.appendingPathComponent("GUEST.BIN")
         var matched = false
@@ -56,10 +58,7 @@ import DosMacVM
             try await Task.sleep(for: .milliseconds(500))
         }
         if !matched {
-            let blocks = try await session.queryBlock()
-            if let file = blocks.array?.first(where: { ($0["inserted"]?["file"]?.string ?? "").hasSuffix("/support.img") })?["inserted"]?["file"]?.string,
-               let bytes = try? Data(contentsOf: URL(fileURLWithPath: file)), let floppy = try? FAT12Disk(data: bytes),
-               let status = try? floppy.file("STATUS.TXT"), let text = String(data: status, encoding: .ascii) {
+            if let text = try? String(contentsOf: shared.appendingPathComponent("STATUS.TXT"), encoding: .ascii) {
                 log("Generated copy-batch status: " + String(text.prefix(1500)))
             }
             if let frame = session.frameSnapshot(), let provider = CGDataProvider(data: frame.pixels as CFData),
@@ -75,6 +74,25 @@ import DosMacVM
         log("Three MiB copied through guest C: and matched byte for byte.")
         try await session.tap("ret")
         try await Task.sleep(for: .seconds(1))
+        if CommandLine.arguments.contains("--check-floppy-swap") {
+            log("Checking a second support floppy after an explicit eject…")
+            try await session.eject(cdrom: false)
+            try await Task.sleep(for: .seconds(1))
+            let marker = Data("Original DosMac second-floppy acceptance marker.\r\n".utf8)
+            try await session.mountSupportDisk(files: ["SECOND.TXT": marker])
+            let script = "@ECHO OFF\r\nCOPY /B A:\\SECOND.TXT H:\\DMTOOLS\\SECOND.OUT\r\nPAUSE >NUL\r\nEXIT\r\n"
+            try Data(script.utf8).write(to: shared.appendingPathComponent("SHARE.BAT"))
+            try await run("C:\\COMMAND.COM /C H:\\DMTOOLS\\SHARE.BAT", session: session)
+            let deadline = Date().addingTimeInterval(20)
+            var copied = false
+            while Date() < deadline {
+                if (try? Data(contentsOf: shared.appendingPathComponent("SECOND.OUT"))) == marker { copied = true; break }
+                try await Task.sleep(for: .milliseconds(500))
+            }
+            guard copied else { throw VMError.invalid("The second support floppy was not readable after explicit eject") }
+            try await session.tap("ret")
+            log("The second support floppy was readable after explicit eject.")
+        }
         var shutdown = false
         for _ in 0..<3 {
             try await session.sendChord(["ctrl","esc"])
